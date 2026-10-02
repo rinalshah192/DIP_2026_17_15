@@ -1,1 +1,27 @@
+# OS and Editor files
 .DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Raw dataset images (large binaries, >200MB, kept locally)
+data/raw/NODefect_images/
+data/raw/Defect_images/
+data/raw/Mask_images/
+data/raw/defect_free/
+data/raw/defective/
+data/raw/masks/
+data/processed/
+data/**/*.png
+data/**/*.bmp
+data/**/*.jpg
+
+# Allow tracking dataset manifests
+!data/raw/aitex_manifest.csv

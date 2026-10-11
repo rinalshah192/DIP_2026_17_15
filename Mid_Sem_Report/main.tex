@@ -1,0 +1,157 @@
+% ECE501 Digital Image Processing -- Mid-Semester Report (Group 15)
+% Two-page, two-column IEEE format. Build: tectonic main.tex   (or pdflatex/bibtex x2)
+%
+% AUTHORSHIP: course rule = report must not be AI generated.
+% This file contains ONLY structure, equations, verified data tables and placeholders.
+% Every \teamtowrite{...} must be replaced by the team's own prose. Prompts are in the
+% comments under each placeholder. Delete this header comment block before submission.
+\documentclass[conference]{IEEEtran}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[hyphens]{url}
+
+% Visible placeholder for unwritten team prose (remove every use before submitting).
+\newcommand{\teamtowrite}[1]{\textbf{[TEAM TO WRITE: #1]}}
+\newcommand{\verify}[1]{\textbf{[VERIFY: #1]}}
+
+\begin{document}
+
+\title{Adaptive Fabric Surface Defect Detection and Localization Using Classical Texture Descriptors}
+
+% Institution, department, roll numbers, e-mails and instructor were not supplied: fill in.
+\author{\IEEEauthorblockN{Rinal Shah, Varun Hotani, Aadi Mehta, Pratik Agrawal}
+\IEEEauthorblockA{ECE501 Digital Image Processing, Group 15 (Project 17 \verify{confirm project no.})\\
+\textbf{[Institution / Department -- TO FILL]}\\
+\textbf{[Roll numbers / e-mail addresses -- TO FILL]}}}
+
+\maketitle
+
+\begin{abstract}
+% Prompts (3--5 sentences, your own words):
+%  - problem: pixel-level fabric defect detection/localization on AFID
+%  - method: classical, per-fabric normal reference from GLCM+LBP, Mahalanobis deviation, adaptive threshold
+%  - scope: 13-image AFID subset, mean per-image metrics (NOT all 245 images)
+%  - results: patch F1 27.13 %, pixel recall 43.57 %, but pixel IoU 0.36 % -> weak pixel localization
+%  - next step: refine suspicious regions with 64x64 patches; controlled fixed-vs-adaptive comparison
+\teamtowrite{summarise problem, method, 13-image scope, principal patch results, weak pixel localization, next step. Do not quote success figures without the pixel IoU.}
+\end{abstract}
+
+\begin{IEEEkeywords}
+fabric defect detection, texture analysis, GLCM, LBP, Mahalanobis distance, adaptive thresholding, AFID
+\end{IEEEkeywords}
+
+\section{Introduction}
+% Prompts: (1) why fabric inspection is hard (texture variation across weaves, thin/low-contrast defects);
+% (2) AFID: 245 images, 7 fabrics, 140 defect-free + 105 defective, 12 defect types, 4096x256 [3],[4];
+% (3) descriptors used and where they come from: GLCM [1], multiscale LBP [2];
+% (4) project objective in one sentence; (5) what this report covers vs. the full 10-week target
+%     (target outputs such as confidence score and defect-wise analysis are NOT yet done).
+\teamtowrite{inspection problem and texture variation; AFID dataset \cite{silvestre2019,afid}; GLCM \cite{haralick1973} and LBP \cite{ojala2002}; project objective; scope of this mid-semester report.}
+
+\section{Methodology}
+% Prompts: preprocessing -> patching -> descriptors -> per-fabric reference -> deviation score ->
+% threshold -> morphology -> evaluation protocol. Use ONLY settings verified against the code that
+% produced the 13-image run (see TEAM_NOTES.md, issue 1). Values below are from the committed
+% Codes/config.py and are marked VERIFY until the upgraded run is checked.
+\teamtowrite{describe the pipeline in your own words: median filter, CLAHE, patch extraction, GLCM + multiscale LBP descriptor, per-fabric normal model, deviation map, threshold, morphology.}
+\verify{patch size/stride, median kernel, CLAHE clip/grid, GLCM and LBP settings, $k$, $\lambda$, morphology kernel, minimum area, patch ground-truth rule vs. upgraded code}
+
+% Equations (editable). Notation block below is scaffolding for the team to reword.
+\begin{equation}
+d_f(\mathbf{x})=\sqrt{(\mathbf{x}-\boldsymbol{\mu}_f)^{\top}\,\boldsymbol{\Sigma}_{f,\mathrm{reg}}^{+}\,(\mathbf{x}-\boldsymbol{\mu}_f)}
+\label{eq:mahal}
+\end{equation}
+\begin{equation}
+\boldsymbol{\Sigma}_{f,\mathrm{reg}}=\boldsymbol{\Sigma}_f+\lambda\,\frac{\operatorname{tr}(\boldsymbol{\Sigma}_f)}{D}\,\mathbf{I}
+\label{eq:reg}
+\end{equation}
+\begin{equation}
+\tau_f=\mu_{d,f}+k\,\sigma_{d,f}
+\label{eq:tau}
+\end{equation}
+% Notation to explain in the team's own words (confirm each against the code):
+%  x      : D-dimensional patch descriptor (GLCM 30 + LBP 28 = 58 in committed code)
+%  mu_f, Sigma_f : mean and covariance of descriptors from defect-free patches of fabric f
+%  Sigma_reg^+   : pseudoinverse of the regularised covariance; lambda = 1e-4 (committed code scales it by tr/D)
+%  mu_d,f, sigma_d,f : mean/std of d_f over the defect-free reference patches; k = 2.5 (committed code)
+%  tau_f is fabric-specific, calibrated per fabric -- do NOT quote any single tau (e.g. 3.45) as universal.
+\teamtowrite{define $\mathbf{x}$, $\boldsymbol{\mu}_f$, $\boldsymbol{\Sigma}_{f,\mathrm{reg}}$, $\lambda$, $k$ and the pseudoinverse; state which images fit each reference and how the threshold is set.}
+
+% Evaluation protocol (state factually; fill after checking splits):
+%  TP,FP,FN,TN are counted over patches at patch level and over pixels at pixel level.
+%  P=TP/(TP+FP), R=TP/(TP+FN), F1=2TP/(2TP+FP+FN), IoU=TP/(TP+FP+FN), Acc=(TP+TN)/(TP+FP+FN+TN).
+%  Pixel F1 is identical to Dice for the same binary masks. Metrics are computed per image, then averaged.
+\teamtowrite{evaluation protocol: patch and pixel definitions of TP/FP/FN/TN, metric formulas, per-image averaging.}
+\verify{reference-training images, test selection, validation, ROI handling}
+
+\section{Results}
+% Prompts: state subset (13 defective AFID strips, 7 fabric IDs, 6 defect codes), averaging rule
+% (mean per image, not pooled, not all 245 images), then read Table I: overall vs. best/worst fabrics.
+% Do not generalise to all 12 defect types. Earlier 18 % -> 79.83 % patch-accuracy change is a
+% preliminary run comparison (different configuration and fabric coverage), not a controlled experiment.
+\teamtowrite{describe the 13-image evaluation subset, the averaging rule, and the main patterns in Table~\ref{tab:results}.}
+
+\begin{table*}[!t]
+\caption{Mean per-image metrics (\%) on the 13-image AFID subset. Patch: $256\times256$ patches; Pixel: full strip. Pixel F1 equals Dice. Fabric rows average the images of that fabric ID ($n$).}
+\label{tab:results}
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}llrrrrrrrrrrr@{}}
+\toprule
+ & & \multicolumn{5}{c}{Patch} & \multicolumn{5}{c}{Pixel} \\
+\cmidrule(lr){3-7}\cmidrule(lr){8-12}
+Fabric ID & $n$ & Acc & Prec & Rec & F1 & IoU & Acc & Prec & Rec & F1 & IoU \\
+\midrule
+All (mean) & 13 & 79.83 & 21.88 & 41.54 & 27.13 & 20.56 & 80.66 & 0.36 & 43.57 & 0.72 & 0.36 \\
+\midrule
+00 & 2 & 95.55 & 66.67 & 100.00 & 80.00 & 66.67 & 89.75 & 1.16 & 100.00 & 2.29 & 1.16 \\
+01 & 2 & 74.19 & 11.11 & 50.00 & 18.18 & 11.11 & 73.46 & 0.48 & 50.00 & 0.95 & 0.48 \\
+02 & 2 & 70.97 & 11.11 & 50.00 & 18.18 & 10.00 & 72.27 & 0.28 & 50.00 & 0.55 & 0.28 \\
+03 & 2 & 78.26 & 20.00 & 20.00 & 20.00 & 12.50 & 90.34 & 0.34 & 33.18 & 0.68 & 0.34 \\
+04 & 2 & 74.19 & 0.00 & 0.00 & 0.00 & 0.00 & 76.56 & 0.00 & 0.00 & 0.00 & 0.00 \\
+05 & 1 & 96.55 & 66.67 & 100.00 & 80.00 & 66.67 & 87.53 & 0.20 & 100.00 & 0.40 & 0.20 \\
+06 & 2 & 77.42 & 0.00 & 0.00 & 0.00 & 0.00 & 78.12 & 0.00 & 0.00 & 0.00 & 0.00 \\
+\bottomrule
+\end{tabular}
+% Fabric IDs are the ff field of the filenames. Pipeline labels Fabric01--Fabric07 correspond to ff = 00--06
+% in these 13 files; the weave names attached to those labels (Plain, Twill, ...) are unverified, so not used here.
+\end{table*}
+
+% Real-data figure (preferred). Replace the box once an actual AFID prediction/GT figure exists.
+% Do NOT use Results/figures/inspection_Fabric01_Plain_broken_end.png as real-data evidence: it is synthetic.
+\begin{figure}[!t]
+\centering
+\fbox{\parbox{0.9\columnwidth}{\centering\vspace{3em}\textbf{[FIGURE PLACEHOLDER: AFID image, ground-truth mask, deviation map, predicted mask --- provenance to be confirmed]}\vspace{3em}}}
+% \includegraphics[width=\columnwidth]{fig_afid_example.pdf}
+\caption{\textbf{[TEAM: caption, sample filename, and ``real AFID'' provenance]}}
+\label{fig:example}
+\end{figure}
+
+\section{Discussions}
+% Prompts (explanations are hypotheses to test, not established causes):
+%  - patch F1 27.13 % overall; 80 % F1 only for fabric IDs 00 and 05 (n=2 and n=1)
+%  - pixel recall 43.57 % overall; 100 % only on selected samples
+%  - pixel precision/IoU 0.36 %: large false-positive area; accuracy ~80 % is dominated by background
+%  - 256x256 patches + score averaging -> coarse boundaries around thin defects
+%  - fabric IDs 04 and 06: all-zero scores -> check mask pairing, GT content and zero-denominator convention before calling them misses
+%  - no controlled fixed-vs-adaptive comparison and no image-level evaluation yet
+\teamtowrite{interpret low pixel precision/IoU, fabric-to-fabric variability, coarse patch boundaries, and what is not yet evaluated.}
+
+\section{Conclusion}
+% Prompts: what is demonstrated (classical pipeline runs on a 13-image AFID subset), honest limits,
+% next phase: nested 64x64 refinement of suspicious regions, verify labels/masks, fixed-vs-adaptive scales under
+% identical splits, GLCM-only/LBP-only/hybrid, larger test set incl. normal images, per-image masks/overlays,
+% reliability score, false-positive reduction. No claims of industrial robustness or complete localization.
+\teamtowrite{demonstrated capability, limitations, planned next phase.}
+
+\vspace{0.3em}
+{\footnotesize AI assistance: Used to help with coding and debugging.}
+% Optional, only if the page limit allows: one line of individual contributions (Rinal: dataset + report writing;
+% Varun: PPT + report formatting; Aadi: texture-analysis/detection code; Pratik: code, testing, result checking).
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

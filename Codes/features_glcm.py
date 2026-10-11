@@ -51,8 +51,14 @@ class GLCMFeatureExtractor:
         """
         # Quantize to specified number of grey levels
         if self.levels < 256:
-            quantized = (patch.astype(np.float32) / 256.0 * self.levels).astype(np.uint8)
-            quantized = np.clip(quantized, 0, self.levels - 1)
+            p_min = float(patch.min())
+            p_max = float(patch.max())
+            if p_max - p_min > 5:
+                norm_p = (patch.astype(np.float32) - p_min) / (p_max - p_min) * (self.levels - 1)
+                quantized = np.clip(np.round(norm_p), 0, self.levels - 1).astype(np.uint8)
+            else:
+                quantized = (patch.astype(np.float32) / 256.0 * self.levels).astype(np.uint8)
+                quantized = np.clip(quantized, 0, self.levels - 1)
         else:
             quantized = patch.astype(np.uint8)
 

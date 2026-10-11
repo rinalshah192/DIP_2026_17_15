@@ -140,7 +140,16 @@ class AITEXDataset:
                 "009": "knot",
                 "010": "contamination",
                 "011": "nep",
-                "012": "weft_crack"
+                "012": "weft_crack",
+                "016": "warp_break",
+                "019": "broken_warp_end",
+                "022": "snarl",
+                "023": "coarse_pick",
+                "025": "loose_warp",
+                "027": "oil_stain",
+                "029": "double_pick",
+                "030": "weft_crack",
+                "036": "hole"
             }
             code = parts[1].zfill(3)
             if code in defect_code_map:

@@ -44,6 +44,10 @@ LBP_CONFIGS = [
 MAHALANOBIS_REGULARIZATION = 1e-4
 ADAPTIVE_THRESHOLD_K = 2.5  # tau = mu_score + k * sigma_score
 MIN_DEFECT_AREA_PIXELS = 50  # Remove isolated false alarm components smaller than this
+SELVAGE_MARGIN_PIXELS = 40  # Inwards margin to avoid uncropped frayed selvage edge artifacts
+USE_ILLUMINATION_FLATTENING = True  # High-pass background suppression to remove vignetting/gradients
+ILLUMINATION_BLUR_SIGMA = 50.0
+ANOMALY_SCORING_METHOD = "hybrid"  # "hybrid" (prototype + strip relative) or "relative" or "mahalanobis"
 
 # Defect and Fabric Metadata (AITEX AFID benchmark)
 FABRIC_TYPES = [
@@ -68,5 +72,13 @@ DEFECT_TYPES = [
     "knot",
     "contamination",
     "nep",
-    "weft_crack"
+    "weft_crack",
+    "warp_break",
+    "broken_warp_end",
+    "snarl",
+    "coarse_pick",
+    "loose_warp",
+    "oil_stain",
+    "double_pick",
+    "hole"
 ]

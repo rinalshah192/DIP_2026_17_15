@@ -10,6 +10,9 @@ __pycache__/
 *$py.class
 *.so
 .pytest_cache/
+venv/
+env/
+.venv/
 
 # Raw dataset images (large binaries, >200MB, kept locally)
 data/raw/NODefect_images/

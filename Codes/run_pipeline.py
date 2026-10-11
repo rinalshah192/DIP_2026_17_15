@@ -31,10 +31,11 @@ from Codes.config import (
     STRIP_WIDTH,
     PATCH_SIZE,
     PATCH_STRIDE,
-    ADAPTIVE_THRESHOLD_K
+    ADAPTIVE_THRESHOLD_K,
+    ANOMALY_SCORING_METHOD
 )
 from Codes.dataset import AITEXDataset, generate_synthetic_aitex_benchmark
-from Codes.preprocessing import Preprocessor, extract_patches
+from Codes.preprocessing import Preprocessor, extract_patches, detect_fabric_roi
 from Codes.features_glcm import GLCMFeatureExtractor
 from Codes.features_lbp import LBPFeatureExtractor
 from Codes.reference_model import TextureReferenceModel
@@ -49,7 +50,7 @@ from Codes.evaluation import (
 def run_full_pipeline(stride: int = PATCH_STRIDE, max_test_samples: int = 14):
     print("=" * 70)
     print("ECE501: Adaptive Fabric Surface Defect Detection & Localization")
-    print("Group 15 - Week 3 Full Pipeline Execution")
+    print("Group 15 - Week 3 Full Pipeline Execution (Elevated Accuracy)")
     print("=" * 70)
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -76,7 +77,7 @@ def run_full_pipeline(stride: int = PATCH_STRIDE, max_test_samples: int = 14):
     segmenter = DefectSegmenter(method="adaptive", adaptive_k=ADAPTIVE_THRESHOLD_K)
     eval_suite = EvaluationSuite()
 
-    # 3. Fit Reference Models per fabric type
+    # 3. Fit Reference Models per fabric type (on genuine fabric ROI)
     print("\n[+] Phase 1: Fitting Normal Fabric Reference Models (GLCM + LBP)...")
     reference_models = {}
 
@@ -86,23 +87,40 @@ def run_full_pipeline(stride: int = PATCH_STRIDE, max_test_samples: int = 14):
 
         for _, row in fabric_cleans.iterrows():
             img = preprocessor.load_image(row["image_path"])
-            proc = preprocessor.process(img)["normalized"]
+            c0, c1 = detect_fabric_roi(img)
+            crop_img = img[:, c0:c1]
+
+            proc = preprocessor.process(crop_img)["normalized"]
             patch_data = extract_patches(proc, patch_size=PATCH_SIZE, stride=stride)
+            if len(patch_data["patches"]) == 0:
+                continue
 
             glcm_feats = glcm_extractor.extract_batch(patch_data["patches"])
             lbp_feats = lbp_extractor.extract_batch(patch_data["patches"])
             fused = np.hstack([glcm_feats, lbp_feats])
             clean_features.append(fused)
 
+        if len(clean_features) == 0:
+            continue
+
         X_normal = np.vstack(clean_features)
-        ref_model = TextureReferenceModel(fabric_type=fabric_name, metric="mahalanobis")
+        ref_model = TextureReferenceModel(
+            fabric_type=fabric_name,
+            metric="mahalanobis",
+            scoring_method=ANOMALY_SCORING_METHOD
+        )
         ref_model.fit(X_normal)
         reference_models[fabric_name] = ref_model
         print(f"    - {fabric_name}: Fitted on {len(X_normal)} patches. Baseline tau = {ref_model.adaptive_threshold:.3f}")
 
-    # 4. Evaluate Test Strips
+    # 4. Evaluate Test Strips (Stratified across all fabric weave types)
     print("\n[+] Phase 2: Running Defect Detection & Localization on Test Strips...")
-    test_subset = defect_images.head(max_test_samples)
+    unique_fabrics = defect_images["fabric_type"].unique()
+    samples_per_type = max(1, max_test_samples // max(1, len(unique_fabrics)))
+    test_subset = defect_images.groupby("fabric_type", group_keys=False).apply(
+        lambda grp: grp.head(samples_per_type)
+    ).head(max_test_samples)
+    print(f"    - Testing {len(test_subset)} stratified test strips across {len(unique_fabrics)} fabric types.")
     visualized_count = 0
 
     for idx, (_, row) in enumerate(test_subset.iterrows()):
@@ -119,23 +137,33 @@ def run_full_pipeline(stride: int = PATCH_STRIDE, max_test_samples: int = 14):
         raw_img = preprocessor.load_image(img_path)
         gt_mask = preprocessor.load_mask(mask_path, target_shape=raw_img.shape) if mask_path else np.zeros_like(raw_img)
 
-        # Preprocessing
-        proc_dict = preprocessor.process(raw_img)
-        norm_img = proc_dict["normalized"]
+        # 1. Automatic Fabric ROI detection (excludes conveyor padding & selvage edge)
+        c0, c1 = detect_fabric_roi(raw_img)
+        crop_raw = raw_img[:, c0:c1]
+        crop_gt = gt_mask[:, c0:c1]
 
-        # Patch extraction
-        patch_dict = extract_patches(norm_img, mask=gt_mask, patch_size=PATCH_SIZE, stride=stride)
+        # 2. Preprocessing with illumination flattening
+        proc_dict = preprocessor.process(crop_raw)
+        norm_crop = proc_dict["normalized"]
+        norm_img = np.full_like(raw_img, 255)
+        norm_img[:, c0:c1] = norm_crop
+
+        # 3. Patch extraction with ROI offset mapping
+        patch_dict = extract_patches(norm_crop, mask=crop_gt, patch_size=PATCH_SIZE, stride=stride, offset_x=c0)
         patches = patch_dict["patches"]
         coords = patch_dict["coordinates"]
         patch_labels = patch_dict["labels"]
 
-        # Feature extraction
+        if len(patches) == 0:
+            continue
+
+        # 4. Feature extraction
         glcm_f = glcm_extractor.extract_batch(patches)
         lbp_f = lbp_extractor.extract_batch(patches)
         fused_f = np.hstack([glcm_f, lbp_f])
 
-        # Anomaly scoring & deviation heatmap
-        patch_scores = ref_model.score_batch(fused_f)
+        # 5. Hybrid Anomaly scoring & deviation heatmap
+        patch_scores, adaptive_thresh = ref_model.score_strip(fused_f)
         heatmap = ref_model.generate_deviation_map(
             patch_scores,
             coordinates=coords,
@@ -143,14 +171,14 @@ def run_full_pipeline(stride: int = PATCH_STRIDE, max_test_samples: int = 14):
             patch_size=PATCH_SIZE
         )
 
-        # Segmentation
-        seg_res = segmenter.segment(heatmap, reference_threshold=ref_model.adaptive_threshold)
+        # 6. Defect Segmentation & Morphological Cleanup
+        seg_res = segmenter.segment(heatmap, reference_threshold=adaptive_thresh)
         pred_mask = seg_res["cleaned_mask"]
 
-        # Patch prediction decisions
-        pred_patch_labels = (patch_scores >= ref_model.adaptive_threshold).astype(int)
+        # 7. Patch prediction decisions
+        pred_patch_labels = (patch_scores >= adaptive_thresh).astype(int)
 
-        # Metrics
+        # 8. Standardized Metrics
         p_metrics = evaluate_patch_classification(patch_labels, pred_patch_labels)
         pix_metrics = evaluate_pixel_localization(pred_mask, gt_mask)
 
@@ -160,7 +188,7 @@ def run_full_pipeline(stride: int = PATCH_STRIDE, max_test_samples: int = 14):
             defect_type=defect_name,
             patch_metrics=p_metrics,
             pixel_metrics=pix_metrics,
-            descriptor_used="GLCM+LBP (Fused)"
+            descriptor_used="GLCM+LBP (Hybrid)"
         )
 
         # Save Visual Collage for first 3 representative defective strips
@@ -173,7 +201,7 @@ def run_full_pipeline(stride: int = PATCH_STRIDE, max_test_samples: int = 14):
                 gt_mask=gt_mask,
                 pred_mask=pred_mask,
                 patch_scores=patch_scores,
-                threshold=ref_model.adaptive_threshold,
+                threshold=adaptive_thresh,
                 defect_type=defect_name,
                 fabric_type=fabric_name
             )
@@ -225,7 +253,7 @@ def _save_visual_inspection_figure(
 
     # 1. Raw strip
     axes[0].imshow(raw_img, cmap="gray", aspect="auto")
-    axes[0].set_title("1. Raw Fabric Strip\n(4096 x 256)", fontsize=11, fontweight="bold")
+    axes[0].set_title(f"1. Raw Fabric Strip\n({raw_img.shape[0]} x {raw_img.shape[1]})", fontsize=11, fontweight="bold")
     axes[0].axis("off")
 
     # 2. CLAHE Normalized
@@ -235,7 +263,7 @@ def _save_visual_inspection_figure(
 
     # 3. Anomaly Deviation Heatmap
     im = axes[2].imshow(heatmap, cmap="inferno", aspect="auto")
-    axes[2].set_title(f"3. Texture Deviation\n(Mahalanobis D_M)", fontsize=11, fontweight="bold")
+    axes[2].set_title("3. Texture Deviation\n(Hybrid D_M + MAD)", fontsize=11, fontweight="bold")
     axes[2].axis("off")
     fig.colorbar(im, ax=axes[2], fraction=0.046, pad=0.04)
 

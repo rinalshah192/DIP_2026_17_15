@@ -7,34 +7,22 @@ ECE501 - Digital Image Processing (Group 15)
 2. Multi-scale rotation-invariant uniform LBP histograms.
 """
 
-from typing import Dict, List, Optional
+from typing import List
 
 import numpy as np
 from skimage.feature import graycomatrix, graycoprops, local_binary_pattern
 
-from fabric_defect.config import (
-    GLCM_DISTANCES,
-    GLCM_ANGLES,
-    GLCM_LEVELS,
-    GLCM_PROPERTIES,
-    LBP_CONFIGS
-)
+from fabric_defect.config import GLCMConfig, LBPConfig
 
 
 class GLCMFeatureExtractor:
     """Extracts statistical texture descriptors from Gray-Level Co-occurrence Matrices."""
 
-    def __init__(
-        self,
-        distances: List[int] = GLCM_DISTANCES,
-        angles: List[float] = GLCM_ANGLES,
-        levels: int = GLCM_LEVELS,
-        properties: List[str] = GLCM_PROPERTIES
-    ):
-        self.distances = distances
-        self.angles = angles
-        self.levels = levels
-        self.properties = properties
+    def __init__(self, cfg: GLCMConfig = GLCMConfig()):
+        self.distances = list(cfg.distances)
+        self.angles = [float(np.deg2rad(a)) for a in cfg.angles_deg]
+        self.levels = cfg.levels
+        self.properties = list(cfg.properties)
 
     def extract_patch(self, patch: np.ndarray) -> np.ndarray:
         """
@@ -99,19 +87,19 @@ class GLCMFeatureExtractor:
 
     def get_feature_names(self) -> List[str]:
         """Return names of extracted GLCM features for explainability."""
+        # Same order as extract_patch: per property, all means then all stds
         names = []
         for prop in self.properties:
-            for d in self.distances:
-                names.append(f"glcm_{prop}_d{d}_mean")
-                names.append(f"glcm_{prop}_d{d}_std")
+            names += [f"glcm_{prop}_d{d}_mean" for d in self.distances]
+            names += [f"glcm_{prop}_d{d}_std" for d in self.distances]
         return names
 
 
 class LBPFeatureExtractor:
     """Extracts multi-scale uniform rotation-invariant LBP histogram descriptors."""
 
-    def __init__(self, configs: Optional[List[Dict]] = None):
-        self.configs = configs if configs is not None else LBP_CONFIGS
+    def __init__(self, cfg: LBPConfig = LBPConfig()):
+        self.scales = [tuple(s) for s in cfg.scales]
 
     def extract_patch(self, patch: np.ndarray) -> np.ndarray:
         """
@@ -124,16 +112,10 @@ class LBPFeatureExtractor:
             1D concatenated histogram vector
         """
         hist_parts = []
-        for cfg in self.configs:
-            P = cfg["points"]
-            R = cfg["radius"]
-            method = cfg.get("method", "uniform")
-
-            # Compute LBP map
-            lbp_map = local_binary_pattern(patch, P=P, R=R, method=method)
-
-            # Uniform rotation-invariant mapping yields (P + 2) bins
-            n_bins = P + 2 if method in ["uniform", "ror", "riu2"] else int(2**P)
+        for P, R in self.scales:
+            lbp_map = local_binary_pattern(patch, P=P, R=R, method="uniform")
+            # Uniform rotation-invariant (riu2) mapping yields P + 2 codes
+            n_bins = P + 2
 
             hist, _ = np.histogram(
                 lbp_map.ravel(),
@@ -163,10 +145,21 @@ class LBPFeatureExtractor:
     def get_feature_names(self) -> List[str]:
         """Return descriptive names of LBP histogram bins."""
         names = []
-        for cfg in self.configs:
-            P = cfg["points"]
-            R = cfg["radius"]
-            n_bins = P + 2
-            for b in range(n_bins):
+        for P, R in self.scales:
+            for b in range(P + 2):
                 names.append(f"lbp_P{P}_R{R}_bin{b}")
         return names
+
+
+class TextureDescriptor:
+    """Fused GLCM + LBP patch descriptor (D = 30 + 28 = 58 with the default config)."""
+
+    def __init__(self, glcm: GLCMConfig = GLCMConfig(), lbp: LBPConfig = LBPConfig()):
+        self.glcm = GLCMFeatureExtractor(glcm)
+        self.lbp = LBPFeatureExtractor(lbp)
+
+    def extract_batch(self, patches: np.ndarray) -> np.ndarray:
+        return np.hstack([self.glcm.extract_batch(patches), self.lbp.extract_batch(patches)])
+
+    def get_feature_names(self) -> List[str]:
+        return self.glcm.get_feature_names() + self.lbp.get_feature_names()

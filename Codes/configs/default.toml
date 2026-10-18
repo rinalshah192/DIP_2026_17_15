@@ -1,0 +1,38 @@
+# Default pipeline configuration (mirrors the dataclass defaults in fabric_defect/config.py).
+# Any key may be removed; missing keys fall back to the defaults.
+
+max_test_samples = 14
+seed = 0
+
+[preprocess]
+median_ksize = 3          # odd, 0 disables
+gaussian_ksize = 0        # odd, 0 disables
+gaussian_sigma = 1.0
+contrast = "clahe"        # clahe | histeq | none
+clahe_clip_limit = 2.0
+clahe_grid = [8, 8]
+illumination_sigma = 50.0 # 0 disables illumination flattening
+selvage_margin = 40
+
+[patch]
+size = 256
+stride = 128
+defect_min_pixels = 25
+
+[glcm]
+distances = [1, 2, 3]
+angles_deg = [0.0, 45.0, 90.0, 135.0]
+levels = 64
+properties = ["contrast", "dissimilarity", "homogeneity", "energy", "correlation"]
+
+[lbp]
+scales = [[8, 1], [16, 2]]  # (P, R) pairs, uniform riu2
+
+[model]
+scoring = "hybrid"        # hybrid | relative | mahalanobis
+regularization = 1e-4
+k = 2.5
+
+[segment]
+kernel_size = 5
+min_area = 50

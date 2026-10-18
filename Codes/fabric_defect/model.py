@@ -10,11 +10,7 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple
 from scipy.spatial.distance import mahalanobis, cdist
 
-from fabric_defect.config import (
-    MAHALANOBIS_REGULARIZATION,
-    ADAPTIVE_THRESHOLD_K,
-    ANOMALY_SCORING_METHOD
-)
+from fabric_defect.config import ModelConfig
 
 
 class TextureReferenceModel:
@@ -26,16 +22,14 @@ class TextureReferenceModel:
     def __init__(
         self,
         fabric_type: str,
-        metric: str = "mahalanobis",
-        regularization: float = MAHALANOBIS_REGULARIZATION,
-        adaptive_k: float = ADAPTIVE_THRESHOLD_K,
-        scoring_method: str = ANOMALY_SCORING_METHOD
+        cfg: ModelConfig = ModelConfig(),
+        metric: str = "mahalanobis"
     ):
         self.fabric_type = fabric_type
         self.metric = metric
-        self.regularization = regularization
-        self.adaptive_k = adaptive_k
-        self.scoring_method = scoring_method
+        self.regularization = cfg.regularization
+        self.adaptive_k = cfg.k
+        self.scoring_method = cfg.scoring
 
         self.mean_vector: Optional[np.ndarray] = None
         self.covariance_matrix: Optional[np.ndarray] = None

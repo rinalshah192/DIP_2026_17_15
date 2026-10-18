@@ -12,27 +12,15 @@ Executes:
 """
 
 from pathlib import Path
-import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from fabric_defect.config import (
-    RAW_DATA_DIR,
-    RESULTS_DIR,
-    FIGURES_DIR,
-    FABRIC_TYPES,
-    STRIP_HEIGHT,
-    STRIP_WIDTH,
-    PATCH_SIZE,
-    PATCH_STRIDE,
-    ADAPTIVE_THRESHOLD_K,
-    ANOMALY_SCORING_METHOD
-)
+from fabric_defect.config import RAW_DATA_DIR, RESULTS_DIR, PipelineConfig
 from fabric_defect.afid import AITEXDataset, load_mask
 from fabric_defect.synthetic import generate_synthetic_aitex_benchmark
-from fabric_defect.preprocessing import Preprocessor, extract_patches, detect_fabric_roi
-from fabric_defect.features import GLCMFeatureExtractor, LBPFeatureExtractor
+from fabric_defect.preprocessing import Preprocessor, detect_fabric_roi, extract_patches, load_image
+from fabric_defect.features import TextureDescriptor
 from fabric_defect.model import TextureReferenceModel
 from fabric_defect.segmentation import DefectSegmenter
 from fabric_defect.metrics import (
@@ -43,20 +31,20 @@ from fabric_defect.metrics import (
 
 
 def run_full_pipeline(
-    stride: int = PATCH_STRIDE,
-    max_test_samples: int = 14,
+    cfg: PipelineConfig = PipelineConfig(),
     data_dir: Path = RAW_DATA_DIR,
+    out_dir: Path = RESULTS_DIR,
     synthetic: bool = False
-):
+) -> pd.DataFrame:
     print("=" * 70)
     print("ECE501: Adaptive Fabric Surface Defect Detection & Localization")
-    print("Group 15 - Week 3 Full Pipeline Execution (Elevated Accuracy)")
     print("=" * 70)
 
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir = Path(out_dir)
+    figures_dir = out_dir / "figures"
+    figures_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Dataset verification
+    # 1. Dataset
     if synthetic:
         print("\n[+] SYNTHETIC smoke run: results are not AFID results.")
         manifest = generate_synthetic_aitex_benchmark(Path(data_dir), samples_per_type=2)
@@ -69,14 +57,17 @@ def run_full_pipeline(
     print(f"    - Defect-free reference strips: {len(clean_images)}")
     print(f"    - Defective test strips:        {len(defect_images)}")
 
-    # 2. Initialize feature extractors & engines
-    preprocessor = Preprocessor(use_median=True, use_clahe=True)
-    glcm_extractor = GLCMFeatureExtractor()
-    lbp_extractor = LBPFeatureExtractor()
-    segmenter = DefectSegmenter(method="adaptive", adaptive_k=ADAPTIVE_THRESHOLD_K)
+    # 2. Engines
+    preprocessor = Preprocessor(cfg.preprocess)
+    descriptor = TextureDescriptor(cfg.glcm, cfg.lbp)
+    segmenter = DefectSegmenter(cfg.segment, method="adaptive", adaptive_k=cfg.model.k)
     eval_suite = EvaluationSuite()
+    psize, stride = cfg.patch.size, cfg.patch.stride
 
-    # 3. Fit Reference Models per fabric type (on genuine fabric ROI)
+    def roi(img):
+        return detect_fabric_roi(img, margin=cfg.preprocess.selvage_margin, min_width=psize)
+
+    # 3. Fit reference models per fabric type (on the genuine fabric ROI)
     print("\n[+] Phase 1: Fitting Normal Fabric Reference Models (GLCM + LBP)...")
     reference_models = {}
 
@@ -85,44 +76,31 @@ def run_full_pipeline(
         clean_features = []
 
         for _, row in fabric_cleans.iterrows():
-            img = preprocessor.load_image(row["image_path"])
-            c0, c1 = detect_fabric_roi(img)
-            crop_img = img[:, c0:c1]
+            img = load_image(row["image_path"])
+            c0, c1 = roi(img)
+            proc = preprocessor.process(img[:, c0:c1])["normalized"]
+            patches = extract_patches(proc, patch_size=psize, stride=stride)["patches"]
+            if len(patches):
+                clean_features.append(descriptor.extract_batch(patches))
 
-            proc = preprocessor.process(crop_img)["normalized"]
-            patch_data = extract_patches(proc, patch_size=PATCH_SIZE, stride=stride)
-            if len(patch_data["patches"]) == 0:
-                continue
-
-            glcm_feats = glcm_extractor.extract_batch(patch_data["patches"])
-            lbp_feats = lbp_extractor.extract_batch(patch_data["patches"])
-            fused = np.hstack([glcm_feats, lbp_feats])
-            clean_features.append(fused)
-
-        if len(clean_features) == 0:
+        if not clean_features:
             continue
 
         X_normal = np.vstack(clean_features)
-        ref_model = TextureReferenceModel(
-            fabric_type=fabric_name,
-            metric="mahalanobis",
-            scoring_method=ANOMALY_SCORING_METHOD
-        )
-        ref_model.fit(X_normal)
+        ref_model = TextureReferenceModel(fabric_type=fabric_name, cfg=cfg.model).fit(X_normal)
         reference_models[fabric_name] = ref_model
         print(f"    - {fabric_name}: Fitted on {len(X_normal)} patches. Baseline tau = {ref_model.adaptive_threshold:.3f}")
 
-    # 4. Evaluate Test Strips (Stratified across all fabric weave types)
+    # 4. Evaluate test strips, stratified across fabric types
     print("\n[+] Phase 2: Running Defect Detection & Localization on Test Strips...")
     unique_fabrics = defect_images["fabric_type"].unique()
-    samples_per_type = max(1, max_test_samples // max(1, len(unique_fabrics)))
+    samples_per_type = max(1, cfg.max_test_samples // max(1, len(unique_fabrics)))
     # groupby().head keeps the fabric_type column (groupby().apply drops it on pandas >= 3)
-    test_subset = defect_images.groupby("fabric_type").head(samples_per_type).head(max_test_samples)
+    test_subset = defect_images.groupby("fabric_type").head(samples_per_type).head(cfg.max_test_samples)
     print(f"    - Testing {len(test_subset)} stratified test strips across {len(unique_fabrics)} fabric types.")
     visualized_count = 0
 
-    for idx, (_, row) in enumerate(test_subset.iterrows()):
-        img_path = row["image_path"]
+    for _, row in test_subset.iterrows():
         mask_paths = row["mask_paths"]
         fabric_name = row["fabric_type"]
         defect_name = row["defect_type"]
@@ -131,121 +109,96 @@ def run_full_pipeline(
         ref_model = reference_models.get(fabric_name)
         if ref_model is None:
             continue
-
-        raw_img = preprocessor.load_image(img_path)
         if not mask_paths:
             # An empty ground truth would silently score every detection as a false positive
             print(f"    ! Skipping {filename}: no ground-truth mask found")
             continue
+
+        raw_img = load_image(row["image_path"])
         gt_mask = load_mask(mask_paths, raw_img.shape)
 
-        # 1. Automatic Fabric ROI detection (excludes conveyor padding & selvage edge)
-        c0, c1 = detect_fabric_roi(raw_img)
-        crop_raw = raw_img[:, c0:c1]
-        crop_gt = gt_mask[:, c0:c1]
-
-        # 2. Preprocessing with illumination flattening
-        proc_dict = preprocessor.process(crop_raw)
-        norm_crop = proc_dict["normalized"]
+        # ROI crop (drops conveyor padding and selvage edge), then preprocessing
+        c0, c1 = roi(raw_img)
+        norm_crop = preprocessor.process(raw_img[:, c0:c1])["normalized"]
         norm_img = np.full_like(raw_img, 255)
         norm_img[:, c0:c1] = norm_crop
 
-        # 3. Patch extraction with ROI offset mapping
-        patch_dict = extract_patches(norm_crop, mask=crop_gt, patch_size=PATCH_SIZE, stride=stride, offset_x=c0)
+        patch_dict = extract_patches(
+            norm_crop, mask=gt_mask[:, c0:c1], patch_size=psize, stride=stride,
+            offset_x=c0, defect_min_pixels=cfg.patch.defect_min_pixels
+        )
         patches = patch_dict["patches"]
-        coords = patch_dict["coordinates"]
-        patch_labels = patch_dict["labels"]
-
         if len(patches) == 0:
             continue
 
-        # 4. Feature extraction
-        glcm_f = glcm_extractor.extract_batch(patches)
-        lbp_f = lbp_extractor.extract_batch(patches)
-        fused_f = np.hstack([glcm_f, lbp_f])
-
-        # 5. Hybrid Anomaly scoring & deviation heatmap
-        patch_scores, adaptive_thresh = ref_model.score_strip(fused_f)
+        # Scoring, deviation heatmap, segmentation
+        patch_scores, adaptive_thresh = ref_model.score_strip(descriptor.extract_batch(patches))
         heatmap = ref_model.generate_deviation_map(
             patch_scores,
-            coordinates=coords,
+            coordinates=patch_dict["coordinates"],
             strip_shape=raw_img.shape,
-            patch_size=PATCH_SIZE
+            patch_size=psize
         )
-
-        # 6. Defect Segmentation & Morphological Cleanup
-        seg_res = segmenter.segment(heatmap, reference_threshold=adaptive_thresh)
-        pred_mask = seg_res["cleaned_mask"]
-
-        # 7. Patch prediction decisions
+        pred_mask = segmenter.segment(heatmap, reference_threshold=adaptive_thresh)["cleaned_mask"]
         pred_patch_labels = (patch_scores >= adaptive_thresh).astype(int)
-
-        # 8. Standardized Metrics
-        p_metrics = evaluate_patch_classification(patch_labels, pred_patch_labels)
-        pix_metrics = evaluate_pixel_localization(pred_mask, gt_mask)
 
         eval_suite.log_result(
             sample_id=filename,
             fabric_type=fabric_name,
             defect_type=defect_name,
-            patch_metrics=p_metrics,
-            pixel_metrics=pix_metrics,
-            descriptor_used="GLCM+LBP (Hybrid)"
+            patch_metrics=evaluate_patch_classification(patch_dict["labels"], pred_patch_labels),
+            pixel_metrics=evaluate_pixel_localization(pred_mask, gt_mask),
+            descriptor_used=f"GLCM+LBP ({cfg.model.scoring})"
         )
 
-        # Save Visual Collage for first 3 representative defective strips
+        # Visual collage for the first 3 defective strips
         if visualized_count < 3 and np.count_nonzero(gt_mask) > 0:
             _save_visual_inspection_figure(
+                out_file=figures_dir / f"inspection_{Path(filename).stem}.png",
                 sample_id=Path(filename).stem,
                 raw_img=raw_img,
                 norm_img=norm_img,
                 heatmap=heatmap,
                 gt_mask=gt_mask,
                 pred_mask=pred_mask,
-                patch_scores=patch_scores,
                 threshold=adaptive_thresh,
                 defect_type=defect_name,
                 fabric_type=fabric_name
             )
             visualized_count += 1
 
-    # 5. Output Summary
+    # 5. Outputs
     results_df = eval_suite.to_dataframe()
-    results_csv = RESULTS_DIR / "metrics_summary.csv"
+    results_csv = out_dir / "metrics_summary.csv"
     results_df.to_csv(results_csv, index=False)
     print(f"\n[+] Saved detailed evaluation metrics to: {results_csv}")
+    eval_suite.summary_table().to_csv(out_dir / "fabric_summary.csv", index=False)
 
-    summary_df = eval_suite.summary_table()
-    summary_csv = RESULTS_DIR / "fabric_summary.csv"
-    summary_df.to_csv(summary_csv, index=False)
+    if results_df.empty:
+        print("[!] No test strips were evaluated.")
+        return results_df
 
     print("\n" + "=" * 70)
-    print("EVALUATION HARNESS BENCHMARK SUMMARY (AITEX AFID)")
+    print("EVALUATION SUMMARY" + (" (SYNTHETIC)" if synthetic else " (AFID)"))
     print("=" * 70)
-    mean_iou = results_df["pixel_iou"].mean()
-    mean_dice = results_df["pixel_dice"].mean()
-    mean_patch_f1 = results_df["patch_f1"].mean()
-    mean_patch_acc = results_df["patch_accuracy"].mean()
-    print(f"Overall Patch Classification Accuracy: {mean_patch_acc * 100:.2f}%")
-    print(f"Overall Patch Classification F1-Score: {mean_patch_f1 * 100:.2f}%")
-    print(f"Overall Pixel Localization Mean IoU:   {mean_iou * 100:.2f}%")
-    print(f"Overall Pixel Localization Mean Dice:  {mean_dice * 100:.2f}%")
+    print(f"Overall Patch Classification Accuracy: {results_df['patch_accuracy'].mean() * 100:.2f}%")
+    print(f"Overall Patch Classification F1-Score: {results_df['patch_f1'].mean() * 100:.2f}%")
+    print(f"Overall Pixel Localization Mean IoU:   {results_df['pixel_iou'].mean() * 100:.2f}%")
+    print(f"Overall Pixel Localization Mean Dice:  {results_df['pixel_dice'].mean() * 100:.2f}%")
     print("=" * 70)
 
-    # Save summary bar plot
-    _save_summary_charts(results_df)
-
+    _save_summary_charts(results_df, figures_dir / "benchmark_performance_charts.png")
     return results_df
 
 
 def _save_visual_inspection_figure(
+    out_file: Path,
     sample_id: str,
     raw_img: np.ndarray,
     norm_img: np.ndarray,
     heatmap: np.ndarray,
     gt_mask: np.ndarray,
     pred_mask: np.ndarray,
-    patch_scores: np.ndarray,
     threshold: float,
     defect_type: str,
     fabric_type: str
@@ -287,13 +240,12 @@ def _save_visual_inspection_figure(
     )
     plt.tight_layout()
 
-    out_file = FIGURES_DIR / f"inspection_{sample_id}.png"
     plt.savefig(out_file, dpi=200, bbox_inches="tight")
     plt.close()
     print(f"[+] Saved inspection collage: {out_file}")
 
 
-def _save_summary_charts(df: pd.DataFrame):
+def _save_summary_charts(df: pd.DataFrame, chart_file: Path):
     """Generate benchmark metric bar charts."""
     if df.empty:
         return
@@ -319,7 +271,6 @@ def _save_summary_charts(df: pd.DataFrame):
     ax[1].tick_params(axis="x", rotation=45)
 
     plt.tight_layout()
-    chart_file = FIGURES_DIR / "benchmark_performance_charts.png"
     plt.savefig(chart_file, dpi=200, bbox_inches="tight")
     plt.close()
     print(f"[+] Saved benchmark chart: {chart_file}")

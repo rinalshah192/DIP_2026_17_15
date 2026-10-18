@@ -12,10 +12,7 @@ import cv2
 import numpy as np
 from typing import Dict, Tuple, Optional
 
-from fabric_defect.config import (
-    ADAPTIVE_THRESHOLD_K,
-    MIN_DEFECT_AREA_PIXELS
-)
+from fabric_defect.config import SegmentConfig
 
 
 class DefectSegmenter:
@@ -23,15 +20,14 @@ class DefectSegmenter:
 
     def __init__(
         self,
+        cfg: SegmentConfig = SegmentConfig(),
         method: str = "adaptive",
-        adaptive_k: float = ADAPTIVE_THRESHOLD_K,
-        min_defect_area: int = MIN_DEFECT_AREA_PIXELS,
-        kernel_size: int = 5
+        adaptive_k: float = 2.5
     ):
         self.method = method
         self.adaptive_k = adaptive_k
-        self.min_defect_area = min_defect_area
-        self.morph_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
+        self.min_defect_area = cfg.min_area
+        self.morph_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (cfg.kernel_size, cfg.kernel_size))
 
     def threshold_heatmap(
         self,

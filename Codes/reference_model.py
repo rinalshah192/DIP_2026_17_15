@@ -12,7 +12,8 @@ from scipy.spatial.distance import mahalanobis, cdist
 
 from Codes.config import (
     MAHALANOBIS_REGULARIZATION,
-    ADAPTIVE_THRESHOLD_K
+    ADAPTIVE_THRESHOLD_K,
+    ANOMALY_SCORING_METHOD
 )
 
 
@@ -27,12 +28,14 @@ class TextureReferenceModel:
         fabric_type: str,
         metric: str = "mahalanobis",
         regularization: float = MAHALANOBIS_REGULARIZATION,
-        adaptive_k: float = ADAPTIVE_THRESHOLD_K
+        adaptive_k: float = ADAPTIVE_THRESHOLD_K,
+        scoring_method: str = ANOMALY_SCORING_METHOD
     ):
         self.fabric_type = fabric_type
         self.metric = metric
         self.regularization = regularization
         self.adaptive_k = adaptive_k
+        self.scoring_method = scoring_method
 
         self.mean_vector: Optional[np.ndarray] = None
         self.covariance_matrix: Optional[np.ndarray] = None
@@ -105,6 +108,56 @@ class TextureReferenceModel:
         """Compute anomaly scores for a matrix of query patches."""
         scores = [self.score_patch(x) for x in X]
         return np.array(scores, dtype=np.float32)
+
+    def score_strip(
+        self,
+        X_strip: np.ndarray,
+        method: Optional[str] = None
+    ) -> Tuple[np.ndarray, float]:
+        """
+        Compute anomaly scores across an entire fabric strip.
+
+        Supports:
+        1. 'hybrid': Robust combination of within-strip spatial anomaly
+           (Median Absolute Deviation) and prototype Mahalanobis consistency.
+        2. 'relative': Pure within-strip robust outlier scoring.
+        3. 'mahalanobis': Cross-roll Mahalanobis distance against training distribution.
+
+        Returns:
+            Tuple of (scores: np.ndarray, threshold: float)
+        """
+        if method is None:
+            method = self.scoring_method
+
+        if method == "mahalanobis":
+            scores = self.score_batch(X_strip)
+            return scores, float(self.adaptive_threshold)
+
+        # 1. Within-strip robust outlier scoring (MAD)
+        strip_med = np.median(X_strip, axis=0)
+        strip_mad = np.median(np.abs(X_strip - strip_med), axis=0)
+        strip_mad = np.maximum(strip_mad, 1e-4)
+
+        z_features = (X_strip - strip_med) / strip_mad
+        rel_scores = np.sqrt(np.sum(z_features ** 2, axis=1))
+
+        rel_med = np.median(rel_scores)
+        rel_mad = np.median(np.abs(rel_scores - rel_med)) + 1e-4
+        z_rel = np.maximum(0.0, (rel_scores - rel_med) / rel_mad)
+
+        if method == "relative":
+            threshold = float(self.adaptive_k)
+            return z_rel.astype(np.float32), threshold
+
+        # Default: 'hybrid'
+        proto_scores = self.score_batch(X_strip)
+        proto_med = np.median(proto_scores)
+        proto_mad = np.median(np.abs(proto_scores - proto_med)) + 1e-4
+        z_proto = np.maximum(0.0, (proto_scores - proto_med) / proto_mad)
+
+        hybrid_scores = (0.6 * z_rel + 0.4 * z_proto).astype(np.float32)
+        threshold = float(self.adaptive_k)
+        return hybrid_scores, threshold
 
     def generate_deviation_map(
         self,

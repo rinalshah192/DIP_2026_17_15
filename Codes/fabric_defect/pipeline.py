@@ -31,8 +31,7 @@ from fabric_defect.config import (
 )
 from fabric_defect.afid import AITEXDataset, generate_synthetic_aitex_benchmark
 from fabric_defect.preprocessing import Preprocessor, extract_patches, detect_fabric_roi
-from fabric_defect.features_glcm import GLCMFeatureExtractor
-from fabric_defect.features_lbp import LBPFeatureExtractor
+from fabric_defect.features import GLCMFeatureExtractor, LBPFeatureExtractor
 from fabric_defect.model import TextureReferenceModel
 from fabric_defect.segmentation import DefectSegmenter
 from fabric_defect.metrics import (

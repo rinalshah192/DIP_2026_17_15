@@ -11,7 +11,9 @@ Executes:
 6. Standardized Evaluation Harness & Visual Artifact Generation
 """
 
+import logging
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -28,6 +30,8 @@ from fabric_defect.metrics import (
     evaluate_pixel_localization,
     EvaluationSuite
 )
+
+log = logging.getLogger(__name__)
 
 
 def split_images(paths, calibration_fraction, rng):
@@ -52,26 +56,21 @@ def run_full_pipeline(
     out_dir: Path = RESULTS_DIR,
     synthetic: bool = False
 ) -> pd.DataFrame:
-    print("=" * 70)
-    print("ECE501: Adaptive Fabric Surface Defect Detection & Localization")
-    print("=" * 70)
-
     out_dir = Path(out_dir)
     figures_dir = out_dir / "figures"
     figures_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. Dataset
     if synthetic:
-        print("\n[+] SYNTHETIC smoke run: results are not AFID results.")
+        log.warning("SYNTHETIC smoke run: results are not AFID results")
         manifest = generate_synthetic_aitex_benchmark(Path(data_dir), samples_per_type=2)
     else:
         manifest = AITEXDataset(data_dir).scan_catalog()
 
-    print(f"\n[+] Total catalogued images: {len(manifest)}")
     clean_images = manifest[~manifest["is_defective"]]
     defect_images = manifest[manifest["is_defective"]]
-    print(f"    - Defect-free reference strips: {len(clean_images)}")
-    print(f"    - Defective test strips:        {len(defect_images)}")
+    log.info("Catalogued %d images: %d defect-free, %d defective",
+             len(manifest), len(clean_images), len(defect_images))
 
     # 2. Engines
     preprocessor = Preprocessor(cfg.preprocess)
@@ -84,7 +83,7 @@ def run_full_pipeline(
         return detect_fabric_roi(img, margin=cfg.preprocess.selvage_margin, min_width=psize)
 
     # 3. Fit reference models per fabric type (on the genuine fabric ROI)
-    print("\n[+] Phase 1: Fitting Normal Fabric Reference Models (GLCM + LBP)...")
+    log.info("Phase 1: fitting per-fabric reference models")
     reference_models = {}
 
     def image_features(paths):
@@ -105,22 +104,23 @@ def run_full_pipeline(
 
         X_fit = image_features(fit_paths)
         if X_fit is None:
+            log.warning("%s: no usable defect-free patches, fabric skipped", fabric_name)
             continue
         X_calib = image_features(calib_paths)
 
         ref_model = TextureReferenceModel(fabric_type=fabric_name, cfg=cfg.model).fit(X_fit, X_calib)
         reference_models[fabric_name] = ref_model
         source = f"{len(calib_paths)} held-out images" if ref_model.calibrated_out_of_sample else "in-sample (too few images)"
-        print(f"    - {fabric_name}: fit on {len(fit_paths)} images / {len(X_fit)} patches; "
-              f"tau = {ref_model.adaptive_threshold:.3f} from {source}")
+        log.info("%s: fit on %d images / %d patches; tau = %.3f from %s",
+                 fabric_name, len(fit_paths), len(X_fit), ref_model.adaptive_threshold, source)
 
     # 4. Evaluate test strips, stratified across fabric types
-    print("\n[+] Phase 2: Running Defect Detection & Localization on Test Strips...")
+    log.info("Phase 2: detection and localization on test strips")
     unique_fabrics = defect_images["fabric_type"].unique()
     samples_per_type = max(1, cfg.max_test_samples // max(1, len(unique_fabrics)))
     # groupby().head keeps the fabric_type column (groupby().apply drops it on pandas >= 3)
     test_subset = defect_images.groupby("fabric_type").head(samples_per_type).head(cfg.max_test_samples)
-    print(f"    - Testing {len(test_subset)} stratified test strips across {len(unique_fabrics)} fabric types.")
+    log.info("Testing %d strips stratified across %d fabrics", len(test_subset), len(unique_fabrics))
     visualized_count = 0
 
     for _, row in test_subset.iterrows():
@@ -131,16 +131,17 @@ def run_full_pipeline(
 
         ref_model = reference_models.get(fabric_name)
         if ref_model is None:
+            log.warning("Skipping %s: no reference model for %s", filename, fabric_name)
             continue
         if not mask_paths:
             # An empty ground truth would silently score every detection as a false positive
-            print(f"    ! Skipping {filename}: no ground-truth mask found")
+            log.warning("Skipping %s: no ground-truth mask found", filename)
             continue
 
         raw_img = load_image(row["image_path"])
         gt_mask = load_mask(mask_paths, raw_img.shape)
         if not gt_mask.any():
-            print(f"    ! {filename}: ground-truth mask is empty; recall-type metrics will be NaN")
+            log.warning("%s: ground-truth mask is empty; recall-type metrics will be NaN", filename)
 
         # ROI crop (drops conveyor padding and selvage edge), then preprocessing
         c0, c1 = roi(raw_img)
@@ -154,6 +155,7 @@ def run_full_pipeline(
         )
         patches = patch_dict["patches"]
         if len(patches) == 0:
+            log.warning("Skipping %s: fabric ROI smaller than one patch", filename)
             continue
 
         # Scoring, deviation heatmap, segmentation
@@ -190,29 +192,28 @@ def run_full_pipeline(
                 defect_type=defect_name,
                 fabric_type=fabric_name
             )
-            print(f"[+] Saved inspection collage: {fig_path}")
+            log.info("Saved %s", fig_path)
             visualized_count += 1
 
     # 5. Outputs
     results_df = eval_suite.to_dataframe()
     results_csv = out_dir / "metrics_summary.csv"
     results_df.to_csv(results_csv, index=False)
-    print(f"\n[+] Saved detailed evaluation metrics to: {results_csv}")
+    log.info("Saved %s", results_csv)
     eval_suite.summary_table().to_csv(out_dir / "fabric_summary.csv", index=False)
 
     if results_df.empty:
-        print("[!] No test strips were evaluated.")
+        log.error("No test strips were evaluated")
         return results_df
 
-    print("\n" + "=" * 70)
-    print("EVALUATION SUMMARY" + (" (SYNTHETIC)" if synthetic else " (AFID)"))
-    print("=" * 70)
-    print(f"Overall Patch Classification Accuracy: {results_df['patch_accuracy'].mean() * 100:.2f}%")
-    print(f"Overall Patch Classification F1-Score: {results_df['patch_f1'].mean() * 100:.2f}%")
-    print(f"Overall Pixel Localization Mean IoU:   {results_df['pixel_iou'].mean() * 100:.2f}%")
-    print(f"Overall Pixel Localization Mean Dice:  {results_df['pixel_dice'].mean() * 100:.2f}%")
-    print("=" * 70)
+    log.info(
+        "Summary%s over %d strips (NaN-skipping means): patch acc %.2f%%, patch F1 %.2f%%, "
+        "pixel IoU %.2f%%, pixel Dice %.2f%%",
+        " (SYNTHETIC)" if synthetic else "", len(results_df),
+        results_df["patch_accuracy"].mean() * 100, results_df["patch_f1"].mean() * 100,
+        results_df["pixel_iou"].mean() * 100, results_df["pixel_dice"].mean() * 100
+    )
 
     chart = save_summary_charts(results_df, figures_dir / "benchmark_performance_charts.png")
-    print(f"[+] Saved benchmark chart: {chart}")
+    log.info("Saved %s", chart)
     return results_df

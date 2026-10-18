@@ -1,4 +1,4 @@
-% ECE501 Digital Image Processing -- Week 4 Project Progress Report (Group 15)
+% ECE501 Digital Image Processing -- Week 5 Project Progress Report (Group 15)
 % Build: tectonic main.tex
 \documentclass[11pt,a4paper]{article}
 
@@ -49,13 +49,13 @@
 
 \pagestyle{fancy}
 \fancyhf{}
-\fancyfoot[C]{\small Group 15 \textbar\ Week 4 Project Progress Report \textbar\ Page \thepage}
+\fancyfoot[C]{\small Group 15 \textbar\ Week 5 Project Progress Report \textbar\ Page \thepage}
 \renewcommand{\headrulewidth}{0pt}
 
 \begin{document}
 
 \begin{center}
-{\LARGE\bfseries Week 4 Project Progress Report}\\[4pt]
+{\LARGE\bfseries Week 5 Project Progress Report}\\[4pt]
 {\large\bfseries Adaptive Fabric Surface Defect Detection and Localization using\\ Classical Texture Descriptors}
 \end{center}
 
@@ -63,15 +63,15 @@
 \textbf{Course Name:} ECE501 Digital Image Processing (DIP)\\
 \textbf{Group Number:} Group 15\\
 \textbf{Group Members:} Rinal Shah, Varun Hotani, Aadi Mehta, Pratik Agrawal\\
-\textbf{Week Number:} Week 4\\
+\textbf{Week Number:} Week 5\\
 \textbf{Date:} October 18, 2026\\
 \textbf{Deliverable:} Production-grade refactoring of the detection pipeline (packaging, correctness fixes, configuration, tests, CI)\\
-\textbf{Branch:} \code{refactor/production-grade} (20 commits on top of the mid-semester report, including the merge of the Week-5 accuracy branch)
+\textbf{Branch:} \code{refactor/production-grade} (20 refactor commits on top of the mid-semester report, including the merge of the \code{week-5} accuracy branch)
 
 \section*{Objectives of the Week}
 \begin{itemize}
   \item Turn the flat \code{Codes/} script collection into an installable, importable Python package with one clear responsibility per module, while keeping the \code{Codes/} folder required by the course submission rules.
-  \item Fold the unmerged accuracy work (fabric ROI cropping, illumination flattening, robust hybrid scoring) into the main line so that every later experiment starts from one code base.
+  \item Bring the accuracy work of the \code{week-5} branch (fabric ROI cropping, illumination flattening, robust hybrid scoring) into the same line as the mid-semester report, so that every later experiment starts from one code base.
   \item Fix the data-handling defects listed as open evidence issues in the mid-semester notes: wrong AFID defect-code map, invented fabric names, swapped strip orientation, silent empty ground truth, silent synthetic fallback.
   \item Remove two methodological weaknesses: an in-sample threshold calibration and the reporting of undefined metrics as~0.
   \item Make every run reproducible and auditable: one typed configuration, a command-line interface, structured logging, and a machine-readable record of each run.
@@ -103,14 +103,14 @@ Reproducibility & Typed config + TOML file, CLI, logging, \code{run_config.json}
 
 \subsection*{A. Repository and Package Restructure}
 
-Until Week~3 the code was ten loose files in \code{Codes/}. Every file imported its siblings as \code{from Codes.x import ...}, which only worked because \code{run_pipeline.py} inserted the repository root into \code{sys.path} at import time. Configuration was a set of module-level constants, plotting lived inside the pipeline runner, and there was no test or entry point other than running that one script.
+Until last week the code was ten loose files in \code{Codes/}. Every file imported its siblings as \code{from Codes.x import ...}, which only worked because \code{run_pipeline.py} inserted the repository root into \code{sys.path} at import time. Configuration was a set of module-level constants, plotting lived inside the pipeline runner, and there was no test or entry point other than running that one script.
 
 The course submission rules fix the top-level layout (\code{Codes/}, \code{Results/}, \code{Mid_Sem_Report/}, \code{End_Sem_Report/}), so \code{Codes/} is kept as the code root and a proper package is placed inside it. Figure~\ref{fig:tree} shows the before/after tree and Table~\ref{tab:modules} lists what each module now owns.
 
 \begin{figure}[h]
 \centering
 \begin{minipage}[t]{0.40\textwidth}
-\textbf{Before (Week 3 / mid-sem)}
+\textbf{Before (Week 4 / mid-sem)}
 \begin{lstlisting}[language={}]
 Codes/
   __init__.py
@@ -128,7 +128,7 @@ requirements.txt     # 9 deps
 \end{lstlisting}
 \end{minipage}\hfill
 \begin{minipage}[t]{0.56\textwidth}
-\textbf{After (Week 4)}
+\textbf{After (Week 5)}
 \begin{lstlisting}[language={}]
 Codes/
   pyproject.toml          # installable package
@@ -205,9 +205,9 @@ Figure~\ref{fig:deps} shows the dependency structure. Dependencies point one way
 
 The package is declared in \code{Codes/pyproject.toml}, which replaces the \code{sys.path} hack with a normal editable install. Three dependencies that nothing imported (\code{reportlab}, \code{PyPDF2}, \code{scikit-learn}) were dropped, and \code{scipy} is no longer imported directly once scoring was vectorised (it is still installed by \code{scikit-image}). \code{opencv-python} became \code{opencv-python-headless}, because the pipeline never opens a window and the headless wheel installs on CI runners without GUI libraries.
 
-\subsection*{B. Integration of the Week-5 Accuracy Branch}
+\subsection*{B. Integration of the \code{week-5} Accuracy Branch}
 
-Pratik's unmerged branch from 11 October (\code{origin/week-5}) carried the accuracy work behind the mid-semester numbers. It was merged first (commit \code{fd47eab}), so that the refactor applies to the code that actually produced the reported results. It contributed four techniques, which are now configurable:
+Pratik's \code{week-5} branch from 11 October carried the accuracy work behind the mid-semester numbers. It had been merged into \code{main} (PR~\#6) but not into the mid-semester branch. It was merged first (commit \code{fd47eab}), so that the refactor applies to the code that actually produced the reported results. It contributed four techniques, which are now configurable:
 
 \paragraph{Fabric ROI.} Uncropped conveyor background and frayed selvage columns are removed before patching. A column $c$ is fabric if its mean intensity is below 245 and its standard deviation above 2. The ROI is the span of fabric columns, shrunk by a margin $m=40$\,px on each side; it falls back to the full width if fewer than one patch width remains.
 
@@ -233,11 +233,11 @@ where $\oslash$ is element-wise division and $d_f$ is the Mahalanobis distance t
 
 These are the most consequential changes of the week. Several of them silently changed what the evaluation measured.
 
-\paragraph{C1. Official AFID defect codes.} AFID filenames have the form \code{nnnn_ddd_ff.png}: image id, defect code, fabric code \cite{silvestre2019}. The old map in \code{dataset.py} numbered the defect classes 001--012 in list order, and the Week-5 branch extended it with names that do not occur in AFID (e.g.\ \code{oil_stain}, \code{broken_warp_end}). The new map uses the 12 official codes (Table~\ref{tab:codes}).
+\paragraph{C1. Official AFID defect codes.} AFID filenames have the form \code{nnnn_ddd_ff.png}: image id, defect code, fabric code \cite{silvestre2019}. The old map in \code{dataset.py} numbered the defect classes 001--012 in list order, and the \code{week-5} branch extended it with names that do not occur in AFID (e.g.\ \code{oil_stain}, \code{broken_warp_end}). The new map uses the 12 official codes (Table~\ref{tab:codes}).
 
 \begin{table}[h]
 \centering
-\caption{AFID defect codes: official name (AFID paper \cite{silvestre2019}) vs.\ the label produced by the Week-5/mid-semester code.}
+\caption{AFID defect codes: official name (AFID paper \cite{silvestre2019}) vs.\ the label produced by the \code{week-5}/mid-semester code.}
 \label{tab:codes}
 \small
 \renewcommand{\arraystretch}{1.08}
@@ -262,7 +262,7 @@ These are the most consequential changes of the week. Several of them silently c
 \end{tabular}
 \end{table}
 
-Re-parsing the 13 images of the committed mid-semester run (\code{Results/metrics_summary.csv}) shows that \textbf{all 13 defect labels were wrong} (Table~\ref{tab:relabel}). Every per-defect statement in earlier reports is therefore unreliable and must be redone; per-image and overall metrics are not affected, because the labels were only used for grouping. The Week-5 inspection figure for \code{0001_002_00} (Figure~\ref{fig:afid}) agrees with the correction: the figure title says ``broken\_pick'', but the ground-truth mask is a single thin line along the 256-row (fabric travel) axis, which is a warp-direction fault, i.e.\ a broken end.
+Re-parsing the 13 images of the committed mid-semester run (\code{Results/metrics_summary.csv}) shows that \textbf{all 13 defect labels were wrong} (Table~\ref{tab:relabel}). Every per-defect statement in earlier reports is therefore unreliable and must be redone; per-image and overall metrics are not affected, because the labels were only used for grouping. The \code{week-5} inspection figure for \code{0001_002_00} (Figure~\ref{fig:afid}) agrees with the correction: the figure title says ``broken\_pick'', but the ground-truth mask is a single thin line along the 256-row (fabric travel) axis, which is a warp-direction fault, i.e.\ a broken end.
 
 \begin{table}[h]
 \centering
@@ -458,7 +458,7 @@ Plotting moved to \code{viz.py}. It uses the non-interactive \code{Agg} backend,
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.82\textwidth]{figures/afid_0001_002_00_week5.jpg}
-\caption{\textbf{Before} (AFID image \code{0001_002_00}, produced by the Week-5/mid-semester code). The $256\times4096$ strip is drawn as five side-by-side tall panels, which compresses the long axis. The title and mask label say ``broken\_pick'', but code 002 is officially a broken end, and the single warp-direction line in the ground-truth panel agrees with the official name.}
+\caption{\textbf{Before} (AFID image \code{0001_002_00}, produced by the \code{week-5}/mid-semester code). The $256\times4096$ strip is drawn as five side-by-side tall panels, which compresses the long axis. The title and mask label say ``broken\_pick'', but code 002 is officially a broken end, and the single warp-direction line in the ground-truth panel agrees with the official name.}
 \label{fig:afid}
 \end{figure}
 
@@ -566,7 +566,7 @@ Improving reproducibility in ML research \cite{pineau2021} & Report exact code v
 
 \begin{table}[h]
 \centering
-\caption{Code base before (\code{fd47eab}, after the Week-5 merge) and after the refactor (\code{e591877}).}
+\caption{Code base before (\code{fd47eab}, after the \code{week-5} merge) and after the refactor (\code{e591877}).}
 \label{tab:codemetrics}
 \small
 \begin{tabular}{@{}lrr@{}}
@@ -641,7 +641,7 @@ Recall is about 50\,\% for every fabric because the two strips per fabric are a 
   \item \textbf{Library drift.} pandas~3 changed \code{groupby().apply} semantics and broke the runner without any code change on our side. Pinning lower bounds and testing on two Python versions in CI is the guard against this.
 \end{itemize}
 
-\section*{Plan for Next Week (Week 5)}
+\section*{Plan for Next Week (Week 6)}
 \begin{itemize}
   \item \textbf{Re-run the AFID benchmark on the fixed code} with \code{run_config.json} committed alongside, and replace every mid-semester number that depended on labels or on in-sample $\tau$. Evaluate all 105 defective images instead of 13 so that per-defect statements have support.
   \item \textbf{Controlled scoring ablation:} \code{hybrid} vs.\ \code{relative} vs.\ \code{mahalanobis} under the same seed and split, reported per official defect class, to quantify the full-width blind spot.
@@ -652,7 +652,7 @@ Recall is about 50\,\% for every fabric because the two strips per fabric are a 
 \end{itemize}
 
 \section*{Conclusion}
-Week~4 turned the research scripts into a maintainable package: installable, configured through one validated config file, driven by a CLI, logged, tested and checked by CI. In doing so it uncovered and fixed problems that affected earlier results: all 13 mid-semester defect labels were wrong, the strip orientation was swapped, missing masks and missing data were replaced silently, undefined metrics were averaged as zeros, and the threshold was calibrated in-sample. Overall mid-semester figures stand, but two recall means change once undefined cases are excluded, and all per-defect analysis must be redone. Week~5 will re-run the AFID benchmark on the corrected code, with full provenance, and use the new configurability for the scoring and refinement experiments.
+Week~5 turned the research scripts into a maintainable package: installable, configured through one validated config file, driven by a CLI, logged, tested and checked by CI. In doing so it uncovered and fixed problems that affected earlier results: all 13 mid-semester defect labels were wrong, the strip orientation was swapped, missing masks and missing data were replaced silently, undefined metrics were averaged as zeros, and the threshold was calibrated in-sample. Overall mid-semester figures stand, but two recall means change once undefined cases are excluded, and all per-defect analysis must be redone. Week~6 will re-run the AFID benchmark on the corrected code, with full provenance, and use the new configurability for the scoring and refinement experiments.
 
 \begin{thebibliography}{99}
 \small

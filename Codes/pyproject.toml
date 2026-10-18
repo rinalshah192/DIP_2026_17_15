@@ -15,6 +15,9 @@ dependencies = [
     "pandas>=2.0",
 ]
 
+[project.scripts]
+fabric-defect = "fabric_defect.cli:main"
+
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 

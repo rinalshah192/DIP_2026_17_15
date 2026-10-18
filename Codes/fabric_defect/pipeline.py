@@ -56,16 +56,16 @@ def run_full_pipeline(
     out_dir: Path = RESULTS_DIR,
     synthetic: bool = False
 ) -> pd.DataFrame:
-    out_dir = Path(out_dir)
-    figures_dir = out_dir / "figures"
-    figures_dir.mkdir(parents=True, exist_ok=True)
-
     # 1. Dataset
     if synthetic:
         log.warning("SYNTHETIC smoke run: results are not AFID results")
         manifest = generate_synthetic_aitex_benchmark(Path(data_dir), samples_per_type=2)
     else:
         manifest = AITEXDataset(data_dir).scan_catalog()
+
+    out_dir = Path(out_dir)
+    figures_dir = out_dir / "figures"
+    figures_dir.mkdir(parents=True, exist_ok=True)
 
     clean_images = manifest[~manifest["is_defective"]]
     defect_images = manifest[manifest["is_defective"]]

@@ -27,6 +27,4 @@ data/**/*.png
 data/**/*.bmp
 data/**/*.jpg
 
-# Allow tracking dataset manifests
-!data/raw/aitex_manifest.csv
 *.egg-info/

@@ -29,7 +29,8 @@ from fabric_defect.config import (
     ADAPTIVE_THRESHOLD_K,
     ANOMALY_SCORING_METHOD
 )
-from fabric_defect.afid import AITEXDataset, generate_synthetic_aitex_benchmark, load_mask
+from fabric_defect.afid import AITEXDataset, load_mask
+from fabric_defect.synthetic import generate_synthetic_aitex_benchmark
 from fabric_defect.preprocessing import Preprocessor, extract_patches, detect_fabric_roi
 from fabric_defect.features import GLCMFeatureExtractor, LBPFeatureExtractor
 from fabric_defect.model import TextureReferenceModel
@@ -41,7 +42,12 @@ from fabric_defect.metrics import (
 )
 
 
-def run_full_pipeline(stride: int = PATCH_STRIDE, max_test_samples: int = 14):
+def run_full_pipeline(
+    stride: int = PATCH_STRIDE,
+    max_test_samples: int = 14,
+    data_dir: Path = RAW_DATA_DIR,
+    synthetic: bool = False
+):
     print("=" * 70)
     print("ECE501: Adaptive Fabric Surface Defect Detection & Localization")
     print("Group 15 - Week 3 Full Pipeline Execution (Elevated Accuracy)")
@@ -51,12 +57,11 @@ def run_full_pipeline(stride: int = PATCH_STRIDE, max_test_samples: int = 14):
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
     # 1. Dataset verification
-    dataset = AITEXDataset(RAW_DATA_DIR)
-    manifest = dataset.scan_catalog()
-
-    if len(manifest) == 0:
-        print("\n[+] No raw dataset detected in data/raw/. Generating reproducible benchmark...")
-        manifest = generate_synthetic_aitex_benchmark(RAW_DATA_DIR, samples_per_type=2)
+    if synthetic:
+        print("\n[+] SYNTHETIC smoke run: results are not AFID results.")
+        manifest = generate_synthetic_aitex_benchmark(Path(data_dir), samples_per_type=2)
+    else:
+        manifest = AITEXDataset(data_dir).scan_catalog()
 
     print(f"\n[+] Total catalogued images: {len(manifest)}")
     clean_images = manifest[~manifest["is_defective"]]

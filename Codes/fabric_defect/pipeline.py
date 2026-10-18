@@ -11,7 +11,12 @@ Executes:
 6. Standardized Evaluation Harness & Visual Artifact Generation
 """
 
+import json
 import logging
+import platform
+import subprocess
+from datetime import datetime, timezone
+from importlib.metadata import version
 from pathlib import Path
 
 import numpy as np
@@ -32,6 +37,34 @@ from fabric_defect.metrics import (
 )
 
 log = logging.getLogger(__name__)
+
+
+def _git_revision() -> dict:
+    """Commit SHA and dirty flag of the checkout, or None outside a git repo."""
+    try:
+        def git(*args):
+            return subprocess.run(["git", *args], cwd=Path(__file__).parent, capture_output=True,
+                                  text=True, check=True).stdout.strip()
+        return {"sha": git("rev-parse", "HEAD"), "dirty": bool(git("status", "--porcelain"))}
+    except (OSError, subprocess.CalledProcessError):
+        return {"sha": None, "dirty": None}
+
+
+def write_run_info(out_dir: Path, cfg: PipelineConfig, data_dir: Path, synthetic: bool) -> Path:
+    """Record everything needed to reproduce a run next to its results."""
+    info = {
+        "started_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "git": _git_revision(),
+        "data_dir": str(data_dir),
+        "synthetic": synthetic,
+        "python": platform.python_version(),
+        "packages": {pkg: version(pkg) for pkg in
+                     ("numpy", "opencv-python-headless", "scikit-image", "pandas", "matplotlib")},
+        "config": cfg.to_dict(),
+    }
+    path = Path(out_dir) / "run_config.json"
+    path.write_text(json.dumps(info, indent=2))
+    return path
 
 
 def split_images(paths, calibration_fraction, rng):
@@ -66,6 +99,7 @@ def run_full_pipeline(
     out_dir = Path(out_dir)
     figures_dir = out_dir / "figures"
     figures_dir.mkdir(parents=True, exist_ok=True)
+    log.info("Saved %s", write_run_info(out_dir, cfg, Path(data_dir), synthetic))
 
     clean_images = manifest[~manifest["is_defective"]]
     defect_images = manifest[manifest["is_defective"]]

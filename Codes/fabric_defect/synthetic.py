@@ -1,174 +1,30 @@
 """
-Dataset Management & AITEX Fabric Image Database (AFID) Handler.
+Synthetic AFID-like benchmark generator (development and tests only).
 ECE501 - Digital Image Processing (Group 15)
 
-Provides:
-1. Dataset cataloguing and structure inspection for AFID.
-2. Image & mask pair loader.
-3. High-fidelity synthetic AFID generator creating realistic 4096x256 woven fabric strips
-   with ground-truth defect masks for complete reproducibility.
+Creates 256x4096 woven-texture strips for 7 synthetic weave types, with injected
+defects and pixel masks. Results on this data are NOT AFID results; the pipeline
+only uses it when asked to explicitly (--synthetic).
 """
 
-import os
 from pathlib import Path
-from typing import List, Dict, Tuple, Optional
+from typing import Tuple
+
 import cv2
 import numpy as np
 import pandas as pd
 
-from Codes.config import (
-    RAW_DATA_DIR,
-    STRIP_HEIGHT,
-    STRIP_WIDTH,
-    FABRIC_TYPES,
-    DEFECT_TYPES
-)
-
-
-class AITEXDataset:
-    """Manages the AITEX Fabric Image Database directory and metadata."""
-
-    def __init__(self, base_dir: Path = RAW_DATA_DIR):
-        self.base_dir = Path(base_dir)
-        self.defect_free_dir = self.base_dir / "defect_free"
-        self.defective_dir = self.base_dir / "defective"
-        self.masks_dir = self.base_dir / "masks"
-
-        # Ensure directory structure exists
-        self.defect_free_dir.mkdir(parents=True, exist_ok=True)
-        self.defective_dir.mkdir(parents=True, exist_ok=True)
-        self.masks_dir.mkdir(parents=True, exist_ok=True)
-
-    def scan_catalog(self) -> pd.DataFrame:
-        """Scan directories and build inventory of available images and masks."""
-        records = []
-
-        # Check for original AITEX directory layout
-        orig_nodefect = self.base_dir / "NODefect_images"
-        orig_defect = self.base_dir / "Defect_images"
-        orig_masks = self.base_dir / "Mask_images"
-
-        if orig_nodefect.exists() and orig_defect.exists():
-            # Scan original AITEX clean images
-            for f in orig_nodefect.rglob("*.png"):
-                fabric_type = self._infer_fabric_type(f.name)
-                records.append({
-                    "image_path": str(f),
-                    "mask_path": None,
-                    "fabric_type": fabric_type,
-                    "is_defective": False,
-                    "defect_type": "none",
-                    "filename": f.name
-                })
-
-            # Scan original AITEX defective images
-            for f in orig_defect.glob("*.png"):
-                fabric_type = self._infer_fabric_type(f.name)
-                defect_type = self._infer_defect_type(f.name)
-                mask_path = orig_masks / f"{f.stem}_mask.png"
-                if not mask_path.exists():
-                    mask_path = orig_masks / f.name
-
-                records.append({
-                    "image_path": str(f),
-                    "mask_path": str(mask_path) if mask_path.exists() else None,
-                    "fabric_type": fabric_type,
-                    "is_defective": True,
-                    "defect_type": defect_type,
-                    "filename": f.name
-                })
-        else:
-            # Scan standardized layout
-            for f in self.defect_free_dir.glob("*.png"):
-                fabric_type = self._infer_fabric_type(f.name)
-                records.append({
-                    "image_path": str(f),
-                    "mask_path": None,
-                    "fabric_type": fabric_type,
-                    "is_defective": False,
-                    "defect_type": "none",
-                    "filename": f.name
-                })
-
-            for f in self.defective_dir.glob("*.png"):
-                fabric_type = self._infer_fabric_type(f.name)
-                defect_type = self._infer_defect_type(f.name)
-                mask_path = self.masks_dir / f"{f.stem}_mask.png"
-                if not mask_path.exists():
-                    mask_path = self.masks_dir / f.name
-
-                records.append({
-                    "image_path": str(f),
-                    "mask_path": str(mask_path) if mask_path.exists() else None,
-                    "fabric_type": fabric_type,
-                    "is_defective": True,
-                    "defect_type": defect_type,
-                    "filename": f.name
-                })
-
-        df = pd.DataFrame(records)
-        return df
-
-    def _infer_fabric_type(self, filename: str) -> str:
-        stem = Path(filename).stem
-        parts = stem.split("_")
-        # In original AITEX (e.g. 0001_000_02.png or 0001_002_00.png), fabric index is the last number
-        if len(parts) >= 3 and parts[-1].isdigit():
-            idx = int(parts[-1]) % len(FABRIC_TYPES)
-            return FABRIC_TYPES[idx]
-
-        for ft in FABRIC_TYPES:
-            code = ft.split("_")[0]
-            if code.lower() in filename.lower() or ft.lower() in filename.lower():
-                return ft
-        return "Fabric01_Plain"
-
-    def _infer_defect_type(self, filename: str) -> str:
-        stem = Path(filename).stem
-        parts = stem.split("_")
-        # In original AITEX (e.g. 0001_002_00.png), defect code is middle part
-        if len(parts) >= 3 and parts[1].isdigit():
-            defect_code_map = {
-                "001": "broken_end",
-                "002": "broken_pick",
-                "003": "broken_yarn",
-                "004": "weft_curling",
-                "005": "fuzzy_ball",
-                "006": "cut_selvage",
-                "007": "crease",
-                "008": "warp_ball",
-                "009": "knot",
-                "010": "contamination",
-                "011": "nep",
-                "012": "weft_crack",
-                "016": "warp_break",
-                "019": "broken_warp_end",
-                "022": "snarl",
-                "023": "coarse_pick",
-                "025": "loose_warp",
-                "027": "oil_stain",
-                "029": "double_pick",
-                "030": "weft_crack",
-                "036": "hole"
-            }
-            code = parts[1].zfill(3)
-            if code in defect_code_map:
-                return defect_code_map[code]
-
-        for dt in DEFECT_TYPES:
-            if dt in filename.lower():
-                return dt
-        return "defect_general"
+from fabric_defect.config import STRIP_HEIGHT, STRIP_WIDTH, FABRIC_TYPES
 
 
 def generate_synthetic_aitex_benchmark(
-    base_dir: Path = RAW_DATA_DIR,
+    base_dir: Path,
     samples_per_type: int = 3,
     height: int = STRIP_HEIGHT,
     width: int = STRIP_WIDTH
 ) -> pd.DataFrame:
     """
-    Generates realistic 4096x256 woven fabric strips across all 7 fabric weave types,
+    Generates realistic 256x4096 woven fabric strips across all 7 fabric weave types,
     including illumination gradients, thread micro-structure, and realistic textile defects
     paired with pixel-level ground truth masks.
 
@@ -200,7 +56,7 @@ def generate_synthetic_aitex_benchmark(
             cv2.imwrite(str(img_path), strip)
             records.append({
                 "image_path": str(img_path),
-                "mask_path": None,
+                "mask_paths": [],
                 "fabric_type": fabric_name,
                 "is_defective": False,
                 "defect_type": "none",
@@ -216,7 +72,7 @@ def generate_synthetic_aitex_benchmark(
             ("cut_selvage", 0.85)   # Edge tear
         ]
 
-        for defect_name, relative_pos in defects_to_inject:
+        for defect_idx, (defect_name, relative_pos) in enumerate(defects_to_inject):
             img_name = f"{fabric_name}_{defect_name}.png"
             mask_name = f"{fabric_name}_{defect_name}_mask.png"
             img_path = defective_dir / img_name
@@ -226,13 +82,14 @@ def generate_synthetic_aitex_benchmark(
                 fabric_type=fabric_name,
                 height=height,
                 width=width,
-                seed=fabric_idx * 500 + hash(defect_name) % 100
+                seed=fabric_idx * 500 + defect_idx  # str hash() is salted per process
             )
 
             defective_strip, mask = _inject_defect(
                 clean_strip,
                 defect_type=defect_name,
-                relative_pos=relative_pos
+                relative_pos=relative_pos,
+                seed=fabric_idx * 500 + defect_idx
             )
 
             cv2.imwrite(str(img_path), defective_strip)
@@ -240,7 +97,7 @@ def generate_synthetic_aitex_benchmark(
 
             records.append({
                 "image_path": str(img_path),
-                "mask_path": str(mask_path),
+                "mask_paths": [str(mask_path)],
                 "fabric_type": fabric_name,
                 "is_defective": True,
                 "defect_type": defect_name,
@@ -248,9 +105,7 @@ def generate_synthetic_aitex_benchmark(
             })
 
     df = pd.DataFrame(records)
-    summary_path = base_dir / "aitex_manifest.csv"
-    df.to_csv(summary_path, index=False)
-    print(f"Catalogued {len(df)} images in {summary_path}")
+    df.to_csv(base_dir / "manifest.csv", index=False)
     return df
 
 
@@ -302,14 +157,21 @@ def _synthesize_fabric_texture(fabric_type: str, height: int, width: int, seed: 
     return final_img
 
 
-def _inject_defect(clean_img: np.ndarray, defect_type: str, relative_pos: float = 0.5) -> Tuple[np.ndarray, np.ndarray]:
+def _inject_defect(
+    clean_img: np.ndarray,
+    defect_type: str,
+    relative_pos: float = 0.5,
+    seed: int = 0
+) -> Tuple[np.ndarray, np.ndarray]:
     """Inject a realistic textile defect into a clean strip and generate binary ground-truth mask."""
+    rng = np.random.default_rng(seed)
     H, W = clean_img.shape
     defective = clean_img.copy()
     mask = np.zeros((H, W), dtype=np.uint8)
 
-    center_y = int(H * relative_pos)
-    center_x = int(W * 0.5)
+    # Defects are spread along the long (fabric-width) axis
+    center_y = H // 2
+    center_x = int(W * relative_pos)
 
     if defect_type == "broken_pick":
         # Missing horizontal weft thread across width
@@ -334,7 +196,7 @@ def _inject_defect(clean_img: np.ndarray, defect_type: str, relative_pos: float 
         # Disrupt texture with high variance clutter
         patch = defective[center_y - radius : center_y + radius, center_x - radius : center_x + radius]
         if patch.shape[0] > 0 and patch.shape[1] > 0:
-            noise = np.random.randint(40, 220, patch.shape, dtype=np.uint8)
+            noise = rng.integers(40, 220, patch.shape, dtype=np.uint8)
             defective[center_y - radius : center_y + radius, center_x - radius : center_x + radius] = noise
 
     elif defect_type == "contamination":

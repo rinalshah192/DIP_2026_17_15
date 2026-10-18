@@ -10,6 +10,7 @@ __pycache__/
 *$py.class
 *.so
 .pytest_cache/
+build/
 venv/
 env/
 .venv/
@@ -26,5 +27,4 @@ data/**/*.png
 data/**/*.bmp
 data/**/*.jpg
 
-# Allow tracking dataset manifests
-!data/raw/aitex_manifest.csv
+*.egg-info/

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fabric-defect"
+version = "0.4.0"
+description = "Classical texture-based fabric defect detection and localization on AFID (ECE501 DIP, Group 15)"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.24",
+    "opencv-python-headless>=4.8",
+    "scikit-image>=0.22",
+    "matplotlib>=3.8",
+    "pandas>=2.0",
+]
+
+[project.scripts]
+fabric-defect = "fabric_defect.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["fabric_defect*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

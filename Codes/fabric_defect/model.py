@@ -8,13 +8,8 @@ and calculates continuous texture-deviation maps for anomaly localization.
 
 import numpy as np
 from typing import Dict, List, Optional, Tuple
-from scipy.spatial.distance import mahalanobis, cdist
 
-from Codes.config import (
-    MAHALANOBIS_REGULARIZATION,
-    ADAPTIVE_THRESHOLD_K,
-    ANOMALY_SCORING_METHOD
-)
+from fabric_defect.config import ModelConfig
 
 
 class TextureReferenceModel:
@@ -26,16 +21,14 @@ class TextureReferenceModel:
     def __init__(
         self,
         fabric_type: str,
-        metric: str = "mahalanobis",
-        regularization: float = MAHALANOBIS_REGULARIZATION,
-        adaptive_k: float = ADAPTIVE_THRESHOLD_K,
-        scoring_method: str = ANOMALY_SCORING_METHOD
+        cfg: ModelConfig = ModelConfig(),
+        metric: str = "mahalanobis"
     ):
         self.fabric_type = fabric_type
         self.metric = metric
-        self.regularization = regularization
-        self.adaptive_k = adaptive_k
-        self.scoring_method = scoring_method
+        self.regularization = cfg.regularization
+        self.adaptive_k = cfg.k
+        self.scoring_method = cfg.scoring
 
         self.mean_vector: Optional[np.ndarray] = None
         self.covariance_matrix: Optional[np.ndarray] = None
@@ -46,14 +39,18 @@ class TextureReferenceModel:
         self.normal_score_mean: float = 0.0
         self.normal_score_std: float = 1.0
         self.adaptive_threshold: float = 2.5
+        self.calibrated_out_of_sample: bool = False
         self.is_fitted: bool = False
 
-    def fit(self, X_normal: np.ndarray) -> "TextureReferenceModel":
+    def fit(self, X_normal: np.ndarray, X_calib: Optional[np.ndarray] = None) -> "TextureReferenceModel":
         """
         Fit reference model on feature vectors extracted from defect-free patches.
 
         Args:
-            X_normal: Array of shape (N, D) from clean fabric samples.
+            X_normal: Array of shape (N, D) from clean fabric samples (fits mu and Sigma).
+            X_calib: Optional patches from *other* defect-free images, used to set tau.
+                Without it tau is calibrated in-sample, which under-estimates the spread
+                of normal scores and so sets tau too low.
         """
         if len(X_normal) == 0:
             raise ValueError("Cannot fit reference model with empty feature array.")
@@ -73,14 +70,15 @@ class TextureReferenceModel:
 
         try:
             self.inv_covariance = np.linalg.pinv(reg_cov)
-        except Exception:
+        except np.linalg.LinAlgError:
             # Fallback to diagonal inverse if pinv encounters conditioning issues
             self.inv_covariance = np.diag(1.0 / (np.var(X_normal, axis=0) + 1e-4))
 
         self.is_fitted = True
 
-        # Evaluate baseline scores on the reference training set
-        scores = self.score_batch(X_normal)
+        # tau from held-out defect-free patches when available
+        self.calibrated_out_of_sample = X_calib is not None and len(X_calib) > 0
+        scores = self.score_batch(X_calib if self.calibrated_out_of_sample else X_normal)
         self.normal_score_mean = float(np.mean(scores))
         self.normal_score_std = float(np.std(scores)) + 1e-6
         self.adaptive_threshold = self.normal_score_mean + self.adaptive_k * self.normal_score_std
@@ -89,25 +87,25 @@ class TextureReferenceModel:
 
     def score_patch(self, x: np.ndarray) -> float:
         """Compute anomaly deviation score for a single feature vector."""
+        return float(self.score_batch(np.asarray(x)[None, :])[0])
+
+    def score_batch(self, X: np.ndarray) -> np.ndarray:
+        """Compute anomaly scores for a matrix of query patches (one matrix product, no Python loop)."""
         if not self.is_fitted:
             raise RuntimeError("Model must be fitted before scoring patches.")
 
-        delta = x - self.mean_vector
+        delta = np.asarray(X) - self.mean_vector
 
         if self.metric == "mahalanobis":
-            dist = np.sqrt(np.maximum(0.0, np.dot(np.dot(delta, self.inv_covariance), delta)))
+            # Row-wise delta^T Sigma^+ delta
+            sq = np.einsum("ij,jk,ik->i", delta, self.inv_covariance, delta, optimize=True)
         elif self.metric == "euclidean_norm":
             # Normalized Euclidean (z-score distance)
-            dist = np.sqrt(np.sum((delta / self.feature_std) ** 2))
+            sq = np.sum((delta / self.feature_std) ** 2, axis=1)
         else:
-            dist = np.linalg.norm(delta)
+            sq = np.sum(delta ** 2, axis=1)
 
-        return float(dist)
-
-    def score_batch(self, X: np.ndarray) -> np.ndarray:
-        """Compute anomaly scores for a matrix of query patches."""
-        scores = [self.score_patch(x) for x in X]
-        return np.array(scores, dtype=np.float32)
+        return np.sqrt(np.maximum(0.0, sq)).astype(np.float32)
 
     def score_strip(
         self,
@@ -172,7 +170,7 @@ class TextureReferenceModel:
         Args:
             patch_scores: 1D array of anomaly scores per patch
             coordinates: Top-left (y, x) position of each patch
-            strip_shape: (Height, Width) of the strip, e.g. (4096, 256)
+            strip_shape: (Height, Width) of the strip, e.g. (256, 4096)
             patch_size: Size of patch (256)
 
         Returns:

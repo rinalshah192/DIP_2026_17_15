@@ -243,7 +243,7 @@ def _save_visual_inspection_figure(
     fabric_type: str
 ):
     """Generates and saves full 5-panel inspection strip collage."""
-    fig, axes = plt.subplots(1, 5, figsize=(18, 12), sharey=True)
+    fig, axes = plt.subplots(5, 1, figsize=(16, 9), sharex=True)
 
     # 1. Raw strip
     axes[0].imshow(raw_img, cmap="gray", aspect="auto")

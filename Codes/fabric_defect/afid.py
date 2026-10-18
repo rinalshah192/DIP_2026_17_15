@@ -5,7 +5,7 @@ ECE501 - Digital Image Processing (Group 15)
 Provides:
 1. Dataset cataloguing and structure inspection for AFID.
 2. Image & mask pair loader.
-3. High-fidelity synthetic AFID generator creating realistic 4096x256 woven fabric strips
+3. High-fidelity synthetic AFID generator creating realistic 256x4096 woven fabric strips
    with ground-truth defect masks for complete reproducibility.
 """
 
@@ -165,7 +165,7 @@ def generate_synthetic_aitex_benchmark(
     width: int = STRIP_WIDTH
 ) -> pd.DataFrame:
     """
-    Generates realistic 4096x256 woven fabric strips across all 7 fabric weave types,
+    Generates realistic 256x4096 woven fabric strips across all 7 fabric weave types,
     including illumination gradients, thread micro-structure, and realistic textile defects
     paired with pixel-level ground truth masks.
 
@@ -305,8 +305,9 @@ def _inject_defect(clean_img: np.ndarray, defect_type: str, relative_pos: float 
     defective = clean_img.copy()
     mask = np.zeros((H, W), dtype=np.uint8)
 
-    center_y = int(H * relative_pos)
-    center_x = int(W * 0.5)
+    # Defects are spread along the long (fabric-width) axis
+    center_y = H // 2
+    center_x = int(W * relative_pos)
 
     if defect_type == "broken_pick":
         # Missing horizontal weft thread across width

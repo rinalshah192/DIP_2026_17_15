@@ -16,8 +16,9 @@ FIGURES_DIR = RESULTS_DIR / "figures"
 REPORTS_DIR = ROOT_DIR / "reports"
 
 # Geometry specifications for AITEX Fabric Image Database
-STRIP_HEIGHT = 4096
-STRIP_WIDTH = 256
+# AFID line-scan strips are 256 rows (fabric travel) x 4096 columns (fabric width)
+STRIP_HEIGHT = 256
+STRIP_WIDTH = 4096
 PATCH_SIZE = 256
 PATCH_STRIDE = 128  # 50% overlap for fine spatial localization (or 256 for non-overlapping)
 

@@ -172,7 +172,7 @@ class TextureReferenceModel:
         Args:
             patch_scores: 1D array of anomaly scores per patch
             coordinates: Top-left (y, x) position of each patch
-            strip_shape: (Height, Width) of the strip, e.g. (4096, 256)
+            strip_shape: (Height, Width) of the strip, e.g. (256, 4096)
             patch_size: Size of patch (256)
 
         Returns:

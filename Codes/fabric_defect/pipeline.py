@@ -13,7 +13,6 @@ Executes:
 
 from pathlib import Path
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
 
 from fabric_defect.config import RAW_DATA_DIR, RESULTS_DIR, PipelineConfig
@@ -23,6 +22,7 @@ from fabric_defect.preprocessing import Preprocessor, detect_fabric_roi, extract
 from fabric_defect.features import TextureDescriptor
 from fabric_defect.model import TextureReferenceModel
 from fabric_defect.segmentation import DefectSegmenter
+from fabric_defect.viz import save_inspection_figure, save_summary_charts
 from fabric_defect.metrics import (
     evaluate_patch_classification,
     evaluate_pixel_localization,
@@ -178,7 +178,7 @@ def run_full_pipeline(
 
         # Visual collage for the first 3 defective strips
         if visualized_count < 3 and np.count_nonzero(gt_mask) > 0:
-            _save_visual_inspection_figure(
+            fig_path = save_inspection_figure(
                 out_file=figures_dir / f"inspection_{Path(filename).stem}.png",
                 sample_id=Path(filename).stem,
                 raw_img=raw_img,
@@ -190,6 +190,7 @@ def run_full_pipeline(
                 defect_type=defect_name,
                 fabric_type=fabric_name
             )
+            print(f"[+] Saved inspection collage: {fig_path}")
             visualized_count += 1
 
     # 5. Outputs
@@ -212,94 +213,6 @@ def run_full_pipeline(
     print(f"Overall Pixel Localization Mean Dice:  {results_df['pixel_dice'].mean() * 100:.2f}%")
     print("=" * 70)
 
-    _save_summary_charts(results_df, figures_dir / "benchmark_performance_charts.png")
+    chart = save_summary_charts(results_df, figures_dir / "benchmark_performance_charts.png")
+    print(f"[+] Saved benchmark chart: {chart}")
     return results_df
-
-
-def _save_visual_inspection_figure(
-    out_file: Path,
-    sample_id: str,
-    raw_img: np.ndarray,
-    norm_img: np.ndarray,
-    heatmap: np.ndarray,
-    gt_mask: np.ndarray,
-    pred_mask: np.ndarray,
-    threshold: float,
-    defect_type: str,
-    fabric_type: str
-):
-    """Generates and saves full 5-panel inspection strip collage."""
-    fig, axes = plt.subplots(5, 1, figsize=(16, 9), sharex=True)
-
-    # 1. Raw strip
-    axes[0].imshow(raw_img, cmap="gray", aspect="auto")
-    axes[0].set_title(f"1. Raw Fabric Strip\n({raw_img.shape[0]} x {raw_img.shape[1]})", fontsize=11, fontweight="bold")
-    axes[0].axis("off")
-
-    # 2. CLAHE Normalized
-    axes[1].imshow(norm_img, cmap="gray", aspect="auto")
-    axes[1].set_title("2. Pre-processed\n(Median + CLAHE)", fontsize=11, fontweight="bold")
-    axes[1].axis("off")
-
-    # 3. Anomaly Deviation Heatmap
-    im = axes[2].imshow(heatmap, cmap="inferno", aspect="auto")
-    axes[2].set_title("3. Texture Deviation\n(Hybrid D_M + MAD)", fontsize=11, fontweight="bold")
-    axes[2].axis("off")
-    fig.colorbar(im, ax=axes[2], fraction=0.046, pad=0.04)
-
-    # 4. Ground Truth Mask
-    axes[3].imshow(gt_mask, cmap="Blues_r", aspect="auto")
-    axes[3].set_title(f"4. Ground Truth Mask\n({defect_type})", fontsize=11, fontweight="bold")
-    axes[3].axis("off")
-
-    # 5. Predicted Defect Localization Mask
-    axes[4].imshow(pred_mask, cmap="Reds", aspect="auto")
-    axes[4].set_title("5. Localized Defect\n(tau=%.2f + Morph)" % threshold, fontsize=11, fontweight="bold")
-    axes[4].axis("off")
-
-    plt.suptitle(
-        f"Defect Localization Inspection - {fabric_type} | Defect: {defect_type}\nSample: {sample_id}",
-        fontsize=14,
-        fontweight="bold",
-        y=0.98
-    )
-    plt.tight_layout()
-
-    plt.savefig(out_file, dpi=200, bbox_inches="tight")
-    plt.close()
-    print(f"[+] Saved inspection collage: {out_file}")
-
-
-def _save_summary_charts(df: pd.DataFrame, chart_file: Path):
-    """Generate benchmark metric bar charts."""
-    if df.empty:
-        return
-
-    fig, ax = plt.subplots(1, 2, figsize=(14, 5))
-
-    # Metric 1: Patch F1 and Accuracy by Defect Type
-    def_summary = df.groupby("defect_type")[["patch_f1", "patch_accuracy", "pixel_iou"]].mean()
-    def_summary.plot(kind="bar", ax=ax[0], colormap="viridis", edgecolor="black", width=0.7)
-    ax[0].set_title("Performance Metrics across Defect Types", fontweight="bold")
-    ax[0].set_ylabel("Score [0.0 - 1.0]")
-    ax[0].set_ylim(0, 1.1)
-    ax[0].grid(axis="y", linestyle="--", alpha=0.5)
-    ax[0].tick_params(axis="x", rotation=45)
-
-    # Metric 2: Pixel IoU by Fabric Type
-    fab_summary = df.groupby("fabric_type")[["pixel_iou", "pixel_dice"]].mean()
-    fab_summary.plot(kind="bar", ax=ax[1], colormap="magma", edgecolor="black", width=0.6)
-    ax[1].set_title("Pixel Localization (IoU & Dice) by Fabric Weave", fontweight="bold")
-    ax[1].set_ylabel("Score [0.0 - 1.0]")
-    ax[1].set_ylim(0, 1.1)
-    ax[1].grid(axis="y", linestyle="--", alpha=0.5)
-    ax[1].tick_params(axis="x", rotation=45)
-
-    plt.tight_layout()
-    plt.savefig(chart_file, dpi=200, bbox_inches="tight")
-    plt.close()
-    print(f"[+] Saved benchmark chart: {chart_file}")
-
-
-if __name__ == "__main__":
-    run_full_pipeline()

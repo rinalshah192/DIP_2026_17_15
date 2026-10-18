@@ -30,6 +30,22 @@ from fabric_defect.metrics import (
 )
 
 
+def split_images(paths, calibration_fraction, rng):
+    """Image-level split of defect-free images into (fit, calibration) lists.
+
+    Splitting by image (not by patch) keeps overlapping patches of one strip on
+    the same side. At least one image always stays in the fit set.
+    """
+    paths = list(paths)
+    if calibration_fraction <= 0 or len(paths) < 2:
+        return paths, []
+    n_calib = min(len(paths) - 1, max(1, round(len(paths) * calibration_fraction)))
+    order = rng.permutation(len(paths))
+    calib = [paths[i] for i in order[:n_calib]]
+    fit = [paths[i] for i in order[n_calib:]]
+    return fit, calib
+
+
 def run_full_pipeline(
     cfg: PipelineConfig = PipelineConfig(),
     data_dir: Path = RAW_DATA_DIR,
@@ -71,25 +87,32 @@ def run_full_pipeline(
     print("\n[+] Phase 1: Fitting Normal Fabric Reference Models (GLCM + LBP)...")
     reference_models = {}
 
-    for fabric_name in clean_images["fabric_type"].unique():
-        fabric_cleans = clean_images[clean_images["fabric_type"] == fabric_name]
-        clean_features = []
-
-        for _, row in fabric_cleans.iterrows():
-            img = load_image(row["image_path"])
+    def image_features(paths):
+        feats = []
+        for path in paths:
+            img = load_image(path)
             c0, c1 = roi(img)
             proc = preprocessor.process(img[:, c0:c1])["normalized"]
             patches = extract_patches(proc, patch_size=psize, stride=stride)["patches"]
             if len(patches):
-                clean_features.append(descriptor.extract_batch(patches))
+                feats.append(descriptor.extract_batch(patches))
+        return np.vstack(feats) if feats else None
 
-        if not clean_features:
+    rng = np.random.default_rng(cfg.seed)
+    for fabric_name in sorted(clean_images["fabric_type"].unique()):
+        paths = clean_images.loc[clean_images["fabric_type"] == fabric_name, "image_path"].tolist()
+        fit_paths, calib_paths = split_images(paths, cfg.model.calibration_fraction, rng)
+
+        X_fit = image_features(fit_paths)
+        if X_fit is None:
             continue
+        X_calib = image_features(calib_paths)
 
-        X_normal = np.vstack(clean_features)
-        ref_model = TextureReferenceModel(fabric_type=fabric_name, cfg=cfg.model).fit(X_normal)
+        ref_model = TextureReferenceModel(fabric_type=fabric_name, cfg=cfg.model).fit(X_fit, X_calib)
         reference_models[fabric_name] = ref_model
-        print(f"    - {fabric_name}: Fitted on {len(X_normal)} patches. Baseline tau = {ref_model.adaptive_threshold:.3f}")
+        source = f"{len(calib_paths)} held-out images" if ref_model.calibrated_out_of_sample else "in-sample (too few images)"
+        print(f"    - {fabric_name}: fit on {len(fit_paths)} images / {len(X_fit)} patches; "
+              f"tau = {ref_model.adaptive_threshold:.3f} from {source}")
 
     # 4. Evaluate test strips, stratified across fabric types
     print("\n[+] Phase 2: Running Defect Detection & Localization on Test Strips...")

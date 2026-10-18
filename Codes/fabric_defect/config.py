@@ -83,12 +83,15 @@ class ModelConfig:
     scoring: str = "hybrid"  # "hybrid", "relative" or "mahalanobis"
     regularization: float = 1e-4  # lambda in Sigma + lambda * tr(Sigma)/D * I
     k: float = 2.5  # tau = mu + k * sigma (mahalanobis) or robust-z cut-off (hybrid/relative)
+    calibration_fraction: float = 0.25  # share of defect-free images held out to calibrate tau
 
     def __post_init__(self):
         if self.scoring not in ("hybrid", "relative", "mahalanobis"):
             raise ValueError(f"unknown scoring method {self.scoring!r}")
         if self.k <= 0:
             raise ValueError("k must be positive")
+        if not 0.0 <= self.calibration_fraction < 1.0:
+            raise ValueError("calibration_fraction must be in [0, 1)")
 
 
 @dataclass(frozen=True)

@@ -39,14 +39,18 @@ class TextureReferenceModel:
         self.normal_score_mean: float = 0.0
         self.normal_score_std: float = 1.0
         self.adaptive_threshold: float = 2.5
+        self.calibrated_out_of_sample: bool = False
         self.is_fitted: bool = False
 
-    def fit(self, X_normal: np.ndarray) -> "TextureReferenceModel":
+    def fit(self, X_normal: np.ndarray, X_calib: Optional[np.ndarray] = None) -> "TextureReferenceModel":
         """
         Fit reference model on feature vectors extracted from defect-free patches.
 
         Args:
-            X_normal: Array of shape (N, D) from clean fabric samples.
+            X_normal: Array of shape (N, D) from clean fabric samples (fits mu and Sigma).
+            X_calib: Optional patches from *other* defect-free images, used to set tau.
+                Without it tau is calibrated in-sample, which under-estimates the spread
+                of normal scores and so sets tau too low.
         """
         if len(X_normal) == 0:
             raise ValueError("Cannot fit reference model with empty feature array.")
@@ -72,8 +76,9 @@ class TextureReferenceModel:
 
         self.is_fitted = True
 
-        # Evaluate baseline scores on the reference training set
-        scores = self.score_batch(X_normal)
+        # tau from held-out defect-free patches when available
+        self.calibrated_out_of_sample = X_calib is not None and len(X_calib) > 0
+        scores = self.score_batch(X_calib if self.calibrated_out_of_sample else X_normal)
         self.normal_score_mean = float(np.mean(scores))
         self.normal_score_std = float(np.std(scores)) + 1e-6
         self.adaptive_threshold = self.normal_score_mean + self.adaptive_k * self.normal_score_std

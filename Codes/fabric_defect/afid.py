@@ -83,7 +83,7 @@ class AITEXDataset:
                 fabric_type = self._infer_fabric_type(f.name)
                 records.append({
                     "image_path": str(f),
-                    "mask_path": None,
+                    "mask_paths": [],
                     "fabric_type": fabric_type,
                     "is_defective": False,
                     "defect_type": "none",
@@ -94,13 +94,9 @@ class AITEXDataset:
             for f in orig_defect.glob("*.png"):
                 fabric_type = self._infer_fabric_type(f.name)
                 defect_type = self._infer_defect_type(f.name)
-                mask_path = orig_masks / f"{f.stem}_mask.png"
-                if not mask_path.exists():
-                    mask_path = orig_masks / f.name
-
                 records.append({
                     "image_path": str(f),
-                    "mask_path": str(mask_path) if mask_path.exists() else None,
+                    "mask_paths": find_masks(orig_masks, f.stem),
                     "fabric_type": fabric_type,
                     "is_defective": True,
                     "defect_type": defect_type,
@@ -112,7 +108,7 @@ class AITEXDataset:
                 fabric_type = self._infer_fabric_type(f.name)
                 records.append({
                     "image_path": str(f),
-                    "mask_path": None,
+                    "mask_paths": [],
                     "fabric_type": fabric_type,
                     "is_defective": False,
                     "defect_type": "none",
@@ -122,13 +118,9 @@ class AITEXDataset:
             for f in self.defective_dir.glob("*.png"):
                 fabric_type = self._infer_fabric_type(f.name)
                 defect_type = self._infer_defect_type(f.name)
-                mask_path = self.masks_dir / f"{f.stem}_mask.png"
-                if not mask_path.exists():
-                    mask_path = self.masks_dir / f.name
-
                 records.append({
                     "image_path": str(f),
-                    "mask_path": str(mask_path) if mask_path.exists() else None,
+                    "mask_paths": find_masks(self.masks_dir, f.stem),
                     "fabric_type": fabric_type,
                     "is_defective": True,
                     "defect_type": defect_type,
@@ -156,6 +148,26 @@ class AITEXDataset:
             if dt != "none" and dt in filename.lower():
                 return dt
         return "unknown"
+
+
+def find_masks(mask_dir: Path, stem: str) -> List[str]:
+    """All mask files for one image; some AFID defects ship as several parts (_mask, _mask1, ...)."""
+    return sorted(str(p) for p in Path(mask_dir).glob(f"{stem}_mask*.png"))
+
+
+def load_mask(paths: List[str], shape: Tuple[int, int]) -> np.ndarray:
+    """Load and OR together every mask part into one binary mask (0 / 255) of the given shape."""
+    if not paths:
+        raise ValueError("No mask files given")
+    out = np.zeros(shape, dtype=np.uint8)
+    for path in paths:
+        part = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+        if part is None:
+            raise FileNotFoundError(f"Failed to read mask at {path}")
+        if part.shape != tuple(shape):
+            part = cv2.resize(part, (shape[1], shape[0]), interpolation=cv2.INTER_NEAREST)
+        out[part > 127] = 255
+    return out
 
 
 def generate_synthetic_aitex_benchmark(
@@ -237,7 +249,7 @@ def generate_synthetic_aitex_benchmark(
 
             records.append({
                 "image_path": str(img_path),
-                "mask_path": str(mask_path),
+                "mask_paths": [str(mask_path)],
                 "fabric_type": fabric_name,
                 "is_defective": True,
                 "defect_type": defect_name,

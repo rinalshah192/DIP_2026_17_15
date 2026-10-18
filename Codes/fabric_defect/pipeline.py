@@ -29,7 +29,7 @@ from fabric_defect.config import (
     ADAPTIVE_THRESHOLD_K,
     ANOMALY_SCORING_METHOD
 )
-from fabric_defect.afid import AITEXDataset, generate_synthetic_aitex_benchmark
+from fabric_defect.afid import AITEXDataset, generate_synthetic_aitex_benchmark, load_mask
 from fabric_defect.preprocessing import Preprocessor, extract_patches, detect_fabric_roi
 from fabric_defect.features import GLCMFeatureExtractor, LBPFeatureExtractor
 from fabric_defect.model import TextureReferenceModel
@@ -119,7 +119,7 @@ def run_full_pipeline(stride: int = PATCH_STRIDE, max_test_samples: int = 14):
 
     for idx, (_, row) in enumerate(test_subset.iterrows()):
         img_path = row["image_path"]
-        mask_path = row["mask_path"]
+        mask_paths = row["mask_paths"]
         fabric_name = row["fabric_type"]
         defect_name = row["defect_type"]
         filename = row["filename"]
@@ -129,7 +129,11 @@ def run_full_pipeline(stride: int = PATCH_STRIDE, max_test_samples: int = 14):
             continue
 
         raw_img = preprocessor.load_image(img_path)
-        gt_mask = preprocessor.load_mask(mask_path, target_shape=raw_img.shape) if mask_path else np.zeros_like(raw_img)
+        if not mask_paths:
+            # An empty ground truth would silently score every detection as a false positive
+            print(f"    ! Skipping {filename}: no ground-truth mask found")
+            continue
+        gt_mask = load_mask(mask_paths, raw_img.shape)
 
         # 1. Automatic Fabric ROI detection (excludes conveyor padding & selvage edge)
         c0, c1 = detect_fabric_roi(raw_img)

@@ -98,17 +98,6 @@ class Preprocessor:
             raise FileNotFoundError(f"Failed to read image at {path}")
         return img
 
-    def load_mask(self, path: str, target_shape: Optional[Tuple[int, int]] = None) -> np.ndarray:
-        """Load and binarize ground truth mask (0=normal, 255=defect)."""
-        mask = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
-        if mask is None:
-            raise FileNotFoundError(f"Failed to read mask at {path}")
-        if target_shape is not None and mask.shape != target_shape:
-            mask = cv2.resize(mask, (target_shape[1], target_shape[0]), interpolation=cv2.INTER_NEAREST)
-        # Strict binarization
-        _, mask_bin = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)
-        return mask_bin
-
     def apply_illumination_flattening(self, img: np.ndarray) -> np.ndarray:
         """Suppresses low-frequency illumination gradients and lens vignetting."""
         if not self.use_illumination_flattening:

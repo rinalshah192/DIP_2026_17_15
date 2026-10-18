@@ -9,7 +9,6 @@ description = "Classical texture-based fabric defect detection and localization 
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.24",
-    "scipy>=1.11",
     "opencv-python-headless>=4.8",
     "scikit-image>=0.22",
     "matplotlib>=3.8",

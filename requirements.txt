@@ -1,7 +1,6 @@
 # Dependencies for Adaptive Fabric Surface Defect Detection and Localization (ECE501 DIP)
 # Preferred: pip install -e "Codes[dev]"  (see Codes/pyproject.toml)
 numpy>=1.24
-scipy>=1.11
 opencv-python-headless>=4.8
 scikit-image>=0.22
 matplotlib>=3.8

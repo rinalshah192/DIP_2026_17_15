@@ -8,7 +8,6 @@ and calculates continuous texture-deviation maps for anomaly localization.
 
 import numpy as np
 from typing import Dict, List, Optional, Tuple
-from scipy.spatial.distance import mahalanobis, cdist
 
 from fabric_defect.config import ModelConfig
 
@@ -67,7 +66,7 @@ class TextureReferenceModel:
 
         try:
             self.inv_covariance = np.linalg.pinv(reg_cov)
-        except Exception:
+        except np.linalg.LinAlgError:
             # Fallback to diagonal inverse if pinv encounters conditioning issues
             self.inv_covariance = np.diag(1.0 / (np.var(X_normal, axis=0) + 1e-4))
 
@@ -83,25 +82,25 @@ class TextureReferenceModel:
 
     def score_patch(self, x: np.ndarray) -> float:
         """Compute anomaly deviation score for a single feature vector."""
+        return float(self.score_batch(np.asarray(x)[None, :])[0])
+
+    def score_batch(self, X: np.ndarray) -> np.ndarray:
+        """Compute anomaly scores for a matrix of query patches (one matrix product, no Python loop)."""
         if not self.is_fitted:
             raise RuntimeError("Model must be fitted before scoring patches.")
 
-        delta = x - self.mean_vector
+        delta = np.asarray(X) - self.mean_vector
 
         if self.metric == "mahalanobis":
-            dist = np.sqrt(np.maximum(0.0, np.dot(np.dot(delta, self.inv_covariance), delta)))
+            # Row-wise delta^T Sigma^+ delta
+            sq = np.einsum("ij,jk,ik->i", delta, self.inv_covariance, delta, optimize=True)
         elif self.metric == "euclidean_norm":
             # Normalized Euclidean (z-score distance)
-            dist = np.sqrt(np.sum((delta / self.feature_std) ** 2))
+            sq = np.sum((delta / self.feature_std) ** 2, axis=1)
         else:
-            dist = np.linalg.norm(delta)
+            sq = np.sum(delta ** 2, axis=1)
 
-        return float(dist)
-
-    def score_batch(self, X: np.ndarray) -> np.ndarray:
-        """Compute anomaly scores for a matrix of query patches."""
-        scores = [self.score_patch(x) for x in X]
-        return np.array(scores, dtype=np.float32)
+        return np.sqrt(np.maximum(0.0, sq)).astype(np.float32)
 
     def score_strip(
         self,

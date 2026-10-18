@@ -2,6 +2,10 @@
 Evaluation Metrics Harness for Fabric Defect Inspection.
 ECE501 - Digital Image Processing (Group 15)
 
+Undefined ratios (zero denominator) are reported as NaN, not 0, so that
+"nothing to measure" is never averaged in as "complete miss". Summaries use
+NaN-skipping means and report how many images each mean is taken over.
+
 Computes standardized quantitative metrics:
 1. Patch-level Classification: Accuracy, Precision, Recall, F1-Score, Specificity
 2. Pixel-level Localization: Intersection over Union (IoU), Dice (F1), Pixel Precision, Recall
@@ -31,12 +35,12 @@ def evaluate_patch_classification(
     tn = int(np.sum((y_true == 0) & (y_pred == 0)))
     fn = int(np.sum((y_true == 1) & (y_pred == 0)))
 
-    total = tp + fp + tn + fn
-    accuracy = (tp + tn) / total if total > 0 else 0.0
-    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
-    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+    accuracy = _ratio(tp + tn, tp + fp + tn + fn)
+    precision = _ratio(tp, tp + fp)
+    recall = _ratio(tp, tp + fn)
+    # Count form of F1: defined (and 0) whenever there is any positive or prediction
+    f1 = _ratio(2 * tp, 2 * tp + fp + fn)
+    specificity = _ratio(tn, tn + fp)
 
     return {
         "patch_accuracy": float(accuracy),
@@ -70,17 +74,12 @@ def evaluate_pixel_localization(
     p_count = p_bin.sum()
     g_count = g_bin.sum()
 
-    # Edge case: both ground truth and prediction are defect-free (true negative strip)
-    if union == 0:
-        iou = 1.0
-        dice = 1.0
-        precision = 1.0
-        recall = 1.0
-    else:
-        iou = float(intersection / union) if union > 0 else 0.0
-        dice = float(2.0 * intersection / (p_count + g_count)) if (p_count + g_count) > 0 else 0.0
-        precision = float(intersection / p_count) if p_count > 0 else 0.0
-        recall = float(intersection / g_count) if g_count > 0 else 0.0
+    # Empty ground truth -> recall undefined; empty prediction -> precision undefined;
+    # both empty -> IoU/Dice undefined as well
+    iou = _ratio(intersection, union)
+    dice = _ratio(2 * intersection, p_count + g_count)
+    precision = _ratio(intersection, p_count)
+    recall = _ratio(intersection, g_count)
 
     return {
         "pixel_iou": iou,
@@ -90,6 +89,10 @@ def evaluate_pixel_localization(
         "gt_defect_pixels": int(g_count),
         "pred_defect_pixels": int(p_count)
     }
+
+
+def _ratio(num: float, den: float) -> float:
+    return float(num) / float(den) if den > 0 else float("nan")
 
 
 class EvaluationSuite:
@@ -129,5 +132,7 @@ class EvaluationSuite:
             "patch_accuracy", "patch_precision", "patch_recall", "patch_f1",
             "pixel_iou", "pixel_dice", "pixel_precision", "pixel_recall"
         ]
-        summary = df.groupby(["fabric_type", "descriptor"])[metric_cols].mean().reset_index()
+        groups = df.groupby(["fabric_type", "descriptor"])
+        summary = groups[metric_cols].mean().reset_index()  # pandas mean skips NaN
+        summary.insert(2, "n_images", groups.size().values)
         return summary

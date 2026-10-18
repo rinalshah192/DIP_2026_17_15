@@ -139,6 +139,8 @@ def run_full_pipeline(
 
         raw_img = load_image(row["image_path"])
         gt_mask = load_mask(mask_paths, raw_img.shape)
+        if not gt_mask.any():
+            print(f"    ! {filename}: ground-truth mask is empty; recall-type metrics will be NaN")
 
         # ROI crop (drops conveyor padding and selvage edge), then preprocessing
         c0, c1 = roi(raw_img)

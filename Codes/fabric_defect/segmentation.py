@@ -12,7 +12,7 @@ import cv2
 import numpy as np
 from typing import Dict, Tuple, Optional
 
-from Codes.config import (
+from fabric_defect.config import (
     ADAPTIVE_THRESHOLD_K,
     MIN_DEFECT_AREA_PIXELS
 )

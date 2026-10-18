@@ -10,7 +10,7 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple
 from scipy.spatial.distance import mahalanobis, cdist
 
-from Codes.config import (
+from fabric_defect.config import (
     MAHALANOBIS_REGULARIZATION,
     ADAPTIVE_THRESHOLD_K,
     ANOMALY_SCORING_METHOD

@@ -11,7 +11,7 @@ import numpy as np
 from typing import List, Dict, Optional
 from skimage.feature import local_binary_pattern
 
-from Codes.config import LBP_CONFIGS
+from fabric_defect.config import LBP_CONFIGS
 
 
 class LBPFeatureExtractor:

@@ -14,7 +14,7 @@ import numpy as np
 from typing import List, Dict, Optional, Tuple
 from skimage.feature import graycomatrix, graycoprops
 
-from Codes.config import (
+from fabric_defect.config import (
     GLCM_DISTANCES,
     GLCM_ANGLES,
     GLCM_LEVELS,

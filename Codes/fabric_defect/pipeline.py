@@ -11,18 +11,13 @@ Executes:
 6. Standardized Evaluation Harness & Visual Artifact Generation
 """
 
-import sys
-import os
 from pathlib import Path
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
-# Add project root to sys.path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from Codes.config import (
+from fabric_defect.config import (
     RAW_DATA_DIR,
     RESULTS_DIR,
     FIGURES_DIR,
@@ -34,13 +29,13 @@ from Codes.config import (
     ADAPTIVE_THRESHOLD_K,
     ANOMALY_SCORING_METHOD
 )
-from Codes.dataset import AITEXDataset, generate_synthetic_aitex_benchmark
-from Codes.preprocessing import Preprocessor, extract_patches, detect_fabric_roi
-from Codes.features_glcm import GLCMFeatureExtractor
-from Codes.features_lbp import LBPFeatureExtractor
-from Codes.reference_model import TextureReferenceModel
-from Codes.segmenter import DefectSegmenter
-from Codes.evaluation import (
+from fabric_defect.afid import AITEXDataset, generate_synthetic_aitex_benchmark
+from fabric_defect.preprocessing import Preprocessor, extract_patches, detect_fabric_roi
+from fabric_defect.features_glcm import GLCMFeatureExtractor
+from fabric_defect.features_lbp import LBPFeatureExtractor
+from fabric_defect.model import TextureReferenceModel
+from fabric_defect.segmentation import DefectSegmenter
+from fabric_defect.metrics import (
     evaluate_patch_classification,
     evaluate_pixel_localization,
     EvaluationSuite

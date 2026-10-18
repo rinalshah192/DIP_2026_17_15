@@ -9,14 +9,13 @@ Provides:
    with ground-truth defect masks for complete reproducibility.
 """
 
-import os
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 import cv2
 import numpy as np
 import pandas as pd
 
-from Codes.config import (
+from fabric_defect.config import (
     RAW_DATA_DIR,
     STRIP_HEIGHT,
     STRIP_WIDTH,

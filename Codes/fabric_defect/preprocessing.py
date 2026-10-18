@@ -12,7 +12,7 @@ Implements:
 import cv2
 import numpy as np
 from typing import Tuple, List, Dict, Optional
-from Codes.config import (
+from fabric_defect.config import (
     MEDIAN_KERNEL_SIZE,
     GAUSSIAN_KERNEL_SIZE,
     GAUSSIAN_SIGMA,

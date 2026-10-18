@@ -9,6 +9,7 @@ Provides:
    with ground-truth defect masks for complete reproducibility.
 """
 
+import re
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 import cv2
@@ -19,9 +20,38 @@ from fabric_defect.config import (
     RAW_DATA_DIR,
     STRIP_HEIGHT,
     STRIP_WIDTH,
-    FABRIC_TYPES,
-    DEFECT_TYPES
+    FABRIC_TYPES
 )
+
+# Official AFID defect codes (Silvestre-Blanes et al., AUTEX Res. J. 2019).
+# 000 marks a defect-free image.
+DEFECT_CODES = {
+    "000": "none",
+    "002": "broken_end",
+    "006": "broken_yarn",
+    "010": "broken_pick",
+    "016": "weft_curling",
+    "019": "fuzzy_ball",
+    "022": "cut_selvage",
+    "023": "crease",
+    "025": "warp_ball",
+    "027": "knot",
+    "029": "contamination",
+    "030": "nep",
+    "036": "weft_crack",
+}
+
+# AFID filenames are nnnn_ddd_ff: image id, defect code, fabric code (00-06)
+_AFID_NAME = re.compile(r"^(\d{4})_(\d{3})_(\d{2})$")
+
+
+def parse_afid_filename(filename: str) -> Optional[Tuple[str, str]]:
+    """Return (fabric_id, defect_name) for an AFID filename, or None if it is not one."""
+    m = _AFID_NAME.match(Path(filename).stem)
+    if m is None:
+        return None
+    _, code, fabric = m.groups()
+    return f"fabric_{fabric}", DEFECT_CODES.get(code, f"unknown_{code}")
 
 
 class AITEXDataset:
@@ -109,55 +139,23 @@ class AITEXDataset:
         return df
 
     def _infer_fabric_type(self, filename: str) -> str:
-        stem = Path(filename).stem
-        parts = stem.split("_")
-        # In original AITEX (e.g. 0001_000_02.png or 0001_002_00.png), fabric index is the last number
-        if len(parts) >= 3 and parts[-1].isdigit():
-            idx = int(parts[-1]) % len(FABRIC_TYPES)
-            return FABRIC_TYPES[idx]
-
+        parsed = parse_afid_filename(filename)
+        if parsed is not None:
+            return parsed[0]
+        # Synthetic benchmark names embed the weave label directly
         for ft in FABRIC_TYPES:
-            code = ft.split("_")[0]
-            if code.lower() in filename.lower() or ft.lower() in filename.lower():
+            if ft.lower() in filename.lower():
                 return ft
-        return "Fabric01_Plain"
+        return "unknown"
 
     def _infer_defect_type(self, filename: str) -> str:
-        stem = Path(filename).stem
-        parts = stem.split("_")
-        # In original AITEX (e.g. 0001_002_00.png), defect code is middle part
-        if len(parts) >= 3 and parts[1].isdigit():
-            defect_code_map = {
-                "001": "broken_end",
-                "002": "broken_pick",
-                "003": "broken_yarn",
-                "004": "weft_curling",
-                "005": "fuzzy_ball",
-                "006": "cut_selvage",
-                "007": "crease",
-                "008": "warp_ball",
-                "009": "knot",
-                "010": "contamination",
-                "011": "nep",
-                "012": "weft_crack",
-                "016": "warp_break",
-                "019": "broken_warp_end",
-                "022": "snarl",
-                "023": "coarse_pick",
-                "025": "loose_warp",
-                "027": "oil_stain",
-                "029": "double_pick",
-                "030": "weft_crack",
-                "036": "hole"
-            }
-            code = parts[1].zfill(3)
-            if code in defect_code_map:
-                return defect_code_map[code]
-
-        for dt in DEFECT_TYPES:
-            if dt in filename.lower():
+        parsed = parse_afid_filename(filename)
+        if parsed is not None:
+            return parsed[1]
+        for dt in DEFECT_CODES.values():
+            if dt != "none" and dt in filename.lower():
                 return dt
-        return "defect_general"
+        return "unknown"
 
 
 def generate_synthetic_aitex_benchmark(

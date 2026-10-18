@@ -49,7 +49,8 @@ USE_ILLUMINATION_FLATTENING = True  # High-pass background suppression to remove
 ILLUMINATION_BLUR_SIGMA = 50.0
 ANOMALY_SCORING_METHOD = "hybrid"  # "hybrid" (prototype + strip relative) or "relative" or "mahalanobis"
 
-# Defect and Fabric Metadata (AITEX AFID benchmark)
+# Weave labels used only by the synthetic benchmark generator.
+# Real AFID fabrics are identified by their filename code (fabric_00 .. fabric_06).
 FABRIC_TYPES = [
     "Fabric01_Plain",
     "Fabric02_Twill",
@@ -58,27 +59,4 @@ FABRIC_TYPES = [
     "Fabric05_Basket",
     "Fabric06_Jacquard",
     "Fabric07_Herringbone"
-]
-
-DEFECT_TYPES = [
-    "broken_end",
-    "broken_pick",
-    "broken_yarn",
-    "weft_curling",
-    "fuzzy_ball",
-    "cut_selvage",
-    "crease",
-    "warp_ball",
-    "knot",
-    "contamination",
-    "nep",
-    "weft_crack",
-    "warp_break",
-    "broken_warp_end",
-    "snarl",
-    "coarse_pick",
-    "loose_warp",
-    "oil_stain",
-    "double_pick",
-    "hole"
 ]

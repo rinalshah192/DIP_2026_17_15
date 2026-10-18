@@ -116,9 +116,8 @@ def run_full_pipeline(
     print("\n[+] Phase 2: Running Defect Detection & Localization on Test Strips...")
     unique_fabrics = defect_images["fabric_type"].unique()
     samples_per_type = max(1, max_test_samples // max(1, len(unique_fabrics)))
-    test_subset = defect_images.groupby("fabric_type", group_keys=False).apply(
-        lambda grp: grp.head(samples_per_type)
-    ).head(max_test_samples)
+    # groupby().head keeps the fabric_type column (groupby().apply drops it on pandas >= 3)
+    test_subset = defect_images.groupby("fabric_type").head(samples_per_type).head(max_test_samples)
     print(f"    - Testing {len(test_subset)} stratified test strips across {len(unique_fabrics)} fabric types.")
     visualized_count = 0
 

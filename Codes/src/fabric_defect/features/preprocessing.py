@@ -15,7 +15,7 @@ from typing import Any, Dict, Optional, Tuple
 import cv2
 import numpy as np
 
-from fabric_defect.config import PreprocessConfig
+from fabric_defect.core.config import PreprocessConfig
 
 
 def load_image(path: str) -> np.ndarray:

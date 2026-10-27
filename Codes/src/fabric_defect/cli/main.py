@@ -13,7 +13,8 @@ from dataclasses import replace
 from pathlib import Path
 from typing import List, Optional
 
-from fabric_defect.config import RAW_DATA_DIR, RESULTS_DIR, PipelineConfig
+from fabric_defect.core.config import PipelineConfig
+from fabric_defect.core.paths import RAW_DATA_DIR, RESULTS_DIR
 
 log = logging.getLogger("fabric_defect")
 
@@ -42,7 +43,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     logging.basicConfig(level=args.log_level, format="%(asctime)s %(levelname)-7s %(name)s: %(message)s")
 
     # Imported here so --help stays fast (cv2/skimage/matplotlib are slow to import)
-    from fabric_defect.pipeline import run_full_pipeline
+    from fabric_defect.pipelines.benchmark import run_full_pipeline
 
     try:
         cfg = PipelineConfig.load(args.config)

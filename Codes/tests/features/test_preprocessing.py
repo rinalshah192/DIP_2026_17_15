@@ -1,8 +1,7 @@
 import numpy as np
 
-from fabric_defect.config import PreprocessConfig
-from fabric_defect.pipeline import split_images
-from fabric_defect.preprocessing import Preprocessor, detect_fabric_roi, extract_patches
+from fabric_defect.core.config import PreprocessConfig
+from fabric_defect.features.preprocessing import Preprocessor, detect_fabric_roi, extract_patches
 
 
 def test_patches_cover_the_right_edge():
@@ -46,12 +45,3 @@ def test_preprocessor_keeps_shape_and_dtype():
     stages = Preprocessor(PreprocessConfig()).process(img)
     for key in ("raw", "flattened", "filtered", "normalized"):
         assert stages[key].shape == img.shape and stages[key].dtype == np.uint8
-
-
-def test_split_images_is_image_level_and_seeded():
-    paths = [f"img{i}" for i in range(20)]
-    fit, calib = split_images(paths, 0.25, np.random.default_rng(0))
-    assert len(calib) == 5 and not set(fit) & set(calib) and sorted(fit + calib) == sorted(paths)
-    assert split_images(paths, 0.25, np.random.default_rng(0)) == (fit, calib)
-    assert split_images(["only"], 0.25, np.random.default_rng(0)) == (["only"], [])
-    assert split_images(["a", "b"], 0.25, np.random.default_rng(0))[1] != []

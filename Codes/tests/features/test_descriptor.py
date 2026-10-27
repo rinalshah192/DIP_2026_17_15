@@ -1,6 +1,8 @@
 import numpy as np
 
-from fabric_defect.features import GLCMFeatureExtractor, LBPFeatureExtractor, TextureDescriptor
+from fabric_defect.features.descriptor import TextureDescriptor
+from fabric_defect.features.glcm import GLCMFeatureExtractor
+from fabric_defect.features.lbp import LBPFeatureExtractor
 
 
 def _patches(n=3, seed=0):

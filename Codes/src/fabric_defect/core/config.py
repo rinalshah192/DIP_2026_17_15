@@ -12,28 +12,6 @@ from dataclasses import asdict, dataclass, field, fields, replace
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-# Repository paths (not tunables)
-ROOT_DIR = Path(__file__).resolve().parents[2]
-RAW_DATA_DIR = ROOT_DIR / "data" / "raw"
-RESULTS_DIR = ROOT_DIR / "Results"
-
-# AFID line-scan strips are 256 rows (fabric travel) x 4096 columns (fabric width)
-STRIP_HEIGHT = 256
-STRIP_WIDTH = 4096
-
-# Weave labels used only by the synthetic benchmark generator.
-# Real AFID fabrics are identified by their filename code (fabric_00 .. fabric_06).
-FABRIC_TYPES = (
-    "Fabric01_Plain",
-    "Fabric02_Twill",
-    "Fabric03_Satin",
-    "Fabric04_Rib",
-    "Fabric05_Basket",
-    "Fabric06_Jacquard",
-    "Fabric07_Herringbone",
-)
-
-
 @dataclass(frozen=True)
 class PreprocessConfig:
     median_ksize: int = 3  # 0 disables the median filter

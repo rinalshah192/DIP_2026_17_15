@@ -3,7 +3,7 @@ import math
 import numpy as np
 import pandas as pd
 
-from fabric_defect.metrics import EvaluationSuite, evaluate_patch_classification, evaluate_pixel_localization
+from fabric_defect.evaluation.metrics import EvaluationSuite, evaluate_patch_classification, evaluate_pixel_localization
 
 
 def test_patch_metrics_known_counts():

@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from fabric_defect.config import ModelConfig
-from fabric_defect.model import TextureReferenceModel
+from fabric_defect.core.config import ModelConfig
+from fabric_defect.modeling.reference import TextureReferenceModel
 
 
 @pytest.fixture

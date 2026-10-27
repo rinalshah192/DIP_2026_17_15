@@ -3,13 +3,13 @@ import json
 import pandas as pd
 import pytest
 
-from fabric_defect.cli import main
-from fabric_defect.config import PipelineConfig
+from fabric_defect.cli.main import main
+from fabric_defect.core.config import PipelineConfig
 
 
 def test_default_toml_matches_dataclass_defaults():
     from pathlib import Path
-    assert PipelineConfig.load(Path(__file__).parents[1] / "configs" / "default.toml") == PipelineConfig()
+    assert PipelineConfig.load(Path(__file__).parents[2] / "configs" / "default.toml") == PipelineConfig()
 
 
 def test_config_rejects_unknown_keys(tmp_path):

@@ -14,7 +14,19 @@ import cv2
 import numpy as np
 import pandas as pd
 
-from fabric_defect.config import STRIP_HEIGHT, STRIP_WIDTH, FABRIC_TYPES
+from fabric_defect.data.afid import STRIP_HEIGHT, STRIP_WIDTH
+
+# Weave labels of the synthetic textures. Real AFID fabrics are identified by
+# their filename code (fabric_00 .. fabric_06); AFID publishes no weave names.
+FABRIC_TYPES = (
+    "Fabric01_Plain",
+    "Fabric02_Twill",
+    "Fabric03_Satin",
+    "Fabric04_Rib",
+    "Fabric05_Basket",
+    "Fabric06_Jacquard",
+    "Fabric07_Herringbone",
+)
 
 
 def generate_synthetic_aitex_benchmark(

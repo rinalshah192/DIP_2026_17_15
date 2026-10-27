@@ -12,7 +12,7 @@ import cv2
 import numpy as np
 from typing import Dict, Tuple, Optional
 
-from fabric_defect.config import SegmentConfig
+from fabric_defect.core.config import SegmentConfig
 
 
 class DefectSegmenter:

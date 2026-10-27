@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import pytest
 
-from fabric_defect.afid import AITEXDataset, find_masks, load_mask, parse_afid_filename
+from fabric_defect.data.afid import AITEXDataset, find_masks, load_mask, parse_afid_filename
 
 
 @pytest.mark.parametrize("name, expected", [

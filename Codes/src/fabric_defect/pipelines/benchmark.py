@@ -22,15 +22,16 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from fabric_defect.config import RAW_DATA_DIR, RESULTS_DIR, PipelineConfig
-from fabric_defect.afid import AITEXDataset, load_mask
-from fabric_defect.synthetic import generate_synthetic_aitex_benchmark
-from fabric_defect.preprocessing import Preprocessor, detect_fabric_roi, extract_patches, load_image
-from fabric_defect.features import TextureDescriptor
-from fabric_defect.model import TextureReferenceModel
-from fabric_defect.segmentation import DefectSegmenter
-from fabric_defect.viz import save_inspection_figure, save_summary_charts
-from fabric_defect.metrics import (
+from fabric_defect.core.config import PipelineConfig
+from fabric_defect.core.paths import RAW_DATA_DIR, RESULTS_DIR
+from fabric_defect.data.afid import AITEXDataset, load_mask
+from fabric_defect.data.synthetic import generate_synthetic_aitex_benchmark
+from fabric_defect.features.preprocessing import Preprocessor, detect_fabric_roi, extract_patches, load_image
+from fabric_defect.features.descriptor import TextureDescriptor
+from fabric_defect.modeling.reference import TextureReferenceModel
+from fabric_defect.modeling.segmentation import DefectSegmenter
+from fabric_defect.visualization.plots import save_inspection_figure, save_summary_charts
+from fabric_defect.evaluation.metrics import (
     evaluate_patch_classification,
     evaluate_pixel_localization,
     EvaluationSuite

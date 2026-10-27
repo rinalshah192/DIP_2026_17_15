@@ -9,7 +9,7 @@ and calculates continuous texture-deviation maps for anomaly localization.
 import numpy as np
 from typing import Dict, List, Optional, Tuple
 
-from fabric_defect.config import ModelConfig
+from fabric_defect.core.config import ModelConfig
 
 
 class TextureReferenceModel:

@@ -16,7 +16,11 @@ import cv2
 import numpy as np
 import pandas as pd
 
-from fabric_defect.config import RAW_DATA_DIR
+from fabric_defect.core.paths import RAW_DATA_DIR
+
+# AFID line-scan strips are 256 rows (fabric travel) x 4096 columns (fabric width)
+STRIP_HEIGHT = 256
+STRIP_WIDTH = 4096
 
 # Official AFID defect codes (Silvestre-Blanes et al., AUTEX Res. J. 2019).
 # 000 marks a defect-free image.

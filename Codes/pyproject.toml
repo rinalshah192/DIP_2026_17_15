@@ -16,14 +16,15 @@ dependencies = [
 ]
 
 [project.scripts]
-fabric-defect = "fabric_defect.cli:main"
+fabric-defect = "fabric_defect.cli.main:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["fabric_defect*"]
+where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Test files in different folders may share a basename
+addopts = "--import-mode=importlib"

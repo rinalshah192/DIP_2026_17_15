@@ -19,7 +19,7 @@ from fabric_defect.core.paths import PROCESSED_DATA_DIR, RAW_DATA_DIR, RESULTS_D
 
 log = logging.getLogger("fabric_defect")
 
-SCORING = ["hybrid", "relative", "mahalanobis", "ocsvm", "iforest"]
+SCORING = ["hybrid", "relative", "mahalanobis", "strip_mahalanobis", "ocsvm", "iforest"]
 
 
 def _common(p: argparse.ArgumentParser, default_out: Path) -> None:

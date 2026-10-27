@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from fabric_defect.core.config import ModelConfig
-from fabric_defect.modeling.reference import TextureReferenceModel
+from fabric_defect.modeling.reference import TextureReferenceModel, robust_z
 
 
 @pytest.fixture
@@ -70,3 +70,19 @@ def test_invalid_model_config_rejected():
         ModelConfig(scoring="nope")
     with pytest.raises(ValueError):
         ModelConfig(calibration_fraction=1.0)
+
+
+def test_strip_mahalanobis_removes_a_strip_wide_offset(data):
+    X, _ = data
+    m = TextureReferenceModel("f", ModelConfig(scoring="strip_mahalanobis", k=2.5)).fit(X)
+    strip = X[:40].copy()
+    strip[5] += 25.0
+    plain, _ = m.score_strip(strip)
+    shifted, tau = m.score_strip(strip + 3.0)  # same strip, globally shifted capture
+    assert tau == 2.5 and np.argmax(plain) == np.argmax(shifted) == 5
+    assert (shifted == 0).mean() >= 0.5  # patches at or below the strip median score 0
+
+
+def test_robust_z_is_one_sided():
+    z = robust_z(np.array([1.0, 2.0, 3.0, 4.0, 100.0]))
+    assert z[:3].tolist() == [0.0, 0.0, 0.0] and z[-1] > 50

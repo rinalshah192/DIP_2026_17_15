@@ -13,6 +13,13 @@ from fabric_defect.core.config import ModelConfig
 from fabric_defect.modeling.segmentation import deviation_map
 
 
+def robust_z(scores: np.ndarray) -> np.ndarray:
+    """One-sided robust z-score: (s - median) / MAD, clipped at 0 (only "more anomalous" counts)."""
+    med = np.median(scores)
+    mad = np.median(np.abs(scores - med)) + 1e-4
+    return np.maximum(0.0, (scores - med) / mad).astype(np.float32)
+
+
 class TextureReferenceModel:
     """
     Models the distribution of normal, defect-free fabric texture
@@ -121,6 +128,9 @@ class TextureReferenceModel:
            (Median Absolute Deviation) and prototype Mahalanobis consistency.
         2. 'relative': Pure within-strip robust outlier scoring.
         3. 'mahalanobis': Cross-roll Mahalanobis distance against training distribution.
+        4. 'strip_mahalanobis': Mahalanobis distance, then a robust z-score within the strip.
+           Removes a strip-wide offset (acquisition shift between the defect-free and
+           defective AFID captures) while keeping the fabric model's notion of "normal".
 
         Returns:
             Tuple of (scores: np.ndarray, threshold: float)
@@ -131,6 +141,8 @@ class TextureReferenceModel:
         if method == "mahalanobis":
             scores = self.score_batch(X_strip)
             return scores, float(self.adaptive_threshold)
+        if method == "strip_mahalanobis":
+            return robust_z(self.score_batch(X_strip)), float(self.adaptive_k)
 
         # 1. Within-strip robust outlier scoring (MAD)
         strip_med = np.median(X_strip, axis=0)

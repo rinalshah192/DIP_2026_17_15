@@ -24,7 +24,12 @@ from fabric_defect.core.config import PipelineConfig
 from fabric_defect.core.paths import PROCESSED_DATA_DIR, RAW_DATA_DIR, RESULTS_DIR
 from fabric_defect.data.afid import AITEXDataset, load_mask
 from fabric_defect.data.synthetic import generate_synthetic_aitex_benchmark
-from fabric_defect.evaluation.metrics import EvaluationSuite, evaluate_patch_classification, evaluate_pixel_localization
+from fabric_defect.evaluation.metrics import (
+    EvaluationSuite,
+    evaluate_patch_classification,
+    evaluate_pixel_localization,
+    summarize,
+)
 from fabric_defect.features.cache import ImageFeatures, load_features
 from fabric_defect.features.preprocessing import Preprocessor, load_image
 from fabric_defect.modeling.baselines import OneClassBaseline
@@ -286,6 +291,7 @@ def write_results(results: pd.DataFrame, kept: List[StripResult], cfg: PipelineC
     suite.records = results.to_dict("records")
     suite.summary_table("fabric_type").to_csv(out_dir / "fabric_summary.csv", index=False)
     suite.summary_table("defect_type").to_csv(out_dir / "defect_summary.csv", index=False)
+    (Path(out_dir) / "summary.json").write_text(json.dumps(summarize(results), indent=2))
     log.info("Saved metrics to %s", out_dir)
 
     preprocessor = Preprocessor(cfg.preprocess)
@@ -299,12 +305,12 @@ def write_results(results: pd.DataFrame, kept: List[StripResult], cfg: PipelineC
             defect_type=s.row["defect_type"], fabric_type=s.row["fabric_type"], coarse_mask=s.coarse_mask,
         )
 
+    s = summarize(results)
     log.info(
-        "Summary%s over %d strips (NaN-skipping means): patch acc %.2f%%, patch F1 %.2f%%, "
-        "pixel IoU %.2f%%, pixel Dice %.2f%%",
-        " (SYNTHETIC)" if synthetic else "", len(results),
-        results["patch_accuracy"].mean() * 100, results["patch_f1"].mean() * 100,
-        results["pixel_iou"].mean() * 100, results["pixel_dice"].mean() * 100
+        "Summary%s over %d strips: patch F1 %.2f%% (pooled %.2f%%), pixel IoU %.2f%% (pooled %.2f%%), "
+        "pixel recall %.2f%%",
+        " (SYNTHETIC)" if synthetic else "", s["n_images"], 100 * s["patch_f1"], 100 * s["pooled_patch_f1"],
+        100 * s["pixel_iou"], 100 * s["pooled_pixel_iou"], 100 * s["pixel_recall"]
     )
     save_summary_charts(results, figures_dir / "benchmark_performance_charts.png")
     return results

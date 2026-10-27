@@ -87,7 +87,8 @@ def evaluate_pixel_localization(
         "pixel_precision": precision,
         "pixel_recall": recall,
         "gt_defect_pixels": int(g_count),
-        "pred_defect_pixels": int(p_count)
+        "pred_defect_pixels": int(p_count),
+        "pixel_tp": int(intersection),  # kept so pooled metrics can be summed over images
     }
 
 
@@ -98,9 +99,22 @@ SUMMARY_METRICS = (
 
 
 def summarize(df: pd.DataFrame) -> Dict[str, float]:
-    """NaN-skipping means of the per-image metrics, plus how many images were evaluated."""
+    """NaN-skipping means of the per-image metrics, pooled (micro) metrics, and the image count.
+
+    A per-image mean gives a 50-pixel nep the same weight as a full-width crease
+    and skips images where a ratio is undefined; pooled metrics sum TP/FP/FN
+    over all images first, so they weight every pixel (or patch) equally.
+    """
     out = {"n_images": int(len(df))}
     out.update({m: float(df[m].mean()) if len(df) else float("nan") for m in SUMMARY_METRICS})
+    if len(df):
+        tp, fp, fn = (float(df[f"patch_{k}"].sum()) for k in ("tp", "fp", "fn"))
+        out.update(pooled_patch_precision=_ratio(tp, tp + fp), pooled_patch_recall=_ratio(tp, tp + fn),
+                   pooled_patch_f1=_ratio(2 * tp, 2 * tp + fp + fn))
+        ptp = float(df["pixel_tp"].sum())
+        pred, gt = float(df["pred_defect_pixels"].sum()), float(df["gt_defect_pixels"].sum())
+        out.update(pooled_pixel_iou=_ratio(ptp, pred + gt - ptp), pooled_pixel_dice=_ratio(2 * ptp, pred + gt),
+                   pooled_pixel_precision=_ratio(ptp, pred), pooled_pixel_recall=_ratio(ptp, gt))
     return out
 
 

@@ -3,7 +3,12 @@ import math
 import numpy as np
 import pandas as pd
 
-from fabric_defect.evaluation.metrics import EvaluationSuite, evaluate_patch_classification, evaluate_pixel_localization
+from fabric_defect.evaluation.metrics import (
+    EvaluationSuite,
+    evaluate_patch_classification,
+    evaluate_pixel_localization,
+    summarize,
+)
 
 
 def test_patch_metrics_known_counts():
@@ -42,3 +47,21 @@ def test_summary_skips_nan_and_counts_images():
     row = suite.summary_table().iloc[0]
     assert row["n_images"] == 2 and row["patch_f1"] == 0.5
     assert isinstance(suite.to_dataframe(), pd.DataFrame)
+
+
+def test_pooled_metrics_weight_pixels_not_images():
+    big_gt = np.zeros((10, 100), np.uint8)
+    big_gt[:, :50] = 255
+    big_pred = big_gt.copy()  # perfect on a 500-px defect
+    small_gt = np.zeros((10, 100), np.uint8)
+    small_gt[0, 0:5] = 255
+    small_pred = np.zeros_like(small_gt)
+    small_pred[5, 50:95] = 255  # misses a 5-px defect, 45 false pixels
+    rows = []
+    for pred, gt in ((big_pred, big_gt), (small_pred, small_gt)):
+        rows.append({**evaluate_patch_classification([1, 0], [1, 0]), **evaluate_pixel_localization(pred, gt)})
+    s = summarize(pd.DataFrame(rows))
+    assert s["n_images"] == 2
+    assert s["pixel_iou"] == 0.5  # mean of 1.0 and 0.0
+    assert s["pooled_pixel_iou"] == 500 / (500 + 5 + 45)
+    assert s["pooled_patch_f1"] == 1.0

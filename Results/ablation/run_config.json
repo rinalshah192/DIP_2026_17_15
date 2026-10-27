@@ -1,0 +1,1538 @@
+{
+  "started_utc": "2026-10-27T17:07:44+00:00",
+  "git": {
+    "sha": "5d2fcd6a74181c55a07fbf0e1c7a92768a5241bf",
+    "dirty": true
+  },
+  "data_dir": "/Users/varunhotani/Desktop/dip/data/raw",
+  "synthetic": false,
+  "python": "3.13.5",
+  "packages": {
+    "numpy": "2.5.4",
+    "opencv-python-headless": "5.0.0.93",
+    "scikit-image": "0.26.0",
+    "pandas": "3.0.6",
+    "matplotlib": "3.11.2"
+  },
+  "config": {
+    "preprocess": {
+      "median_ksize": 3,
+      "gaussian_ksize": 0,
+      "gaussian_sigma": 1.0,
+      "contrast": "clahe",
+      "clahe_clip_limit": 2.0,
+      "clahe_grid": [
+        8,
+        8
+      ],
+      "illumination_sigma": 50.0,
+      "selvage_margin": 40
+    },
+    "patch": {
+      "size": 256,
+      "stride": 128,
+      "defect_min_pixels": 25
+    },
+    "glcm": {
+      "distances": [
+        1,
+        2,
+        3
+      ],
+      "angles_deg": [
+        0.0,
+        45.0,
+        90.0,
+        135.0
+      ],
+      "levels": 64,
+      "properties": [
+        "contrast",
+        "dissimilarity",
+        "homogeneity",
+        "energy",
+        "correlation"
+      ]
+    },
+    "lbp": {
+      "scales": [
+        [
+          8,
+          1
+        ],
+        [
+          16,
+          2
+        ]
+      ]
+    },
+    "gabor": {
+      "orientations_deg": [
+        0.0,
+        45.0,
+        90.0,
+        135.0
+      ],
+      "wavelengths": [
+        4.0,
+        8.0,
+        16.0
+      ],
+      "bandwidth": 1.0,
+      "gamma": 0.5
+    },
+    "features": {
+      "use": [
+        "glcm",
+        "lbp"
+      ]
+    },
+    "model": {
+      "scoring": "mahalanobis",
+      "regularization": 0.0001,
+      "k": 2.5,
+      "calibration_fraction": 0.25,
+      "reference": "per_fabric",
+      "ocsvm_nu": 0.1,
+      "iforest_trees": 200
+    },
+    "refine": {
+      "enabled": true,
+      "size": 64,
+      "stride": 32,
+      "k": 2.5
+    },
+    "segment": {
+      "kernel_size": 5,
+      "min_area": 50
+    },
+    "max_test_samples": 0,
+    "seed": 0
+  },
+  "grid": "Codes/configs/experiments/ablation.toml",
+  "variants": {
+    "default": {
+      "preprocess": {
+        "median_ksize": 3,
+        "gaussian_ksize": 0,
+        "gaussian_sigma": 1.0,
+        "contrast": "clahe",
+        "clahe_clip_limit": 2.0,
+        "clahe_grid": [
+          8,
+          8
+        ],
+        "illumination_sigma": 50.0,
+        "selvage_margin": 40
+      },
+      "patch": {
+        "size": 256,
+        "stride": 128,
+        "defect_min_pixels": 25
+      },
+      "glcm": {
+        "distances": [
+          1,
+          2,
+          3
+        ],
+        "angles_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "levels": 64,
+        "properties": [
+          "contrast",
+          "dissimilarity",
+          "homogeneity",
+          "energy",
+          "correlation"
+        ]
+      },
+      "lbp": {
+        "scales": [
+          [
+            8,
+            1
+          ],
+          [
+            16,
+            2
+          ]
+        ]
+      },
+      "gabor": {
+        "orientations_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "wavelengths": [
+          4.0,
+          8.0,
+          16.0
+        ],
+        "bandwidth": 1.0,
+        "gamma": 0.5
+      },
+      "features": {
+        "use": [
+          "glcm",
+          "lbp"
+        ]
+      },
+      "model": {
+        "scoring": "mahalanobis",
+        "regularization": 0.0001,
+        "k": 2.5,
+        "calibration_fraction": 0.25,
+        "reference": "per_fabric",
+        "ocsvm_nu": 0.1,
+        "iforest_trees": 200
+      },
+      "refine": {
+        "enabled": true,
+        "size": 64,
+        "stride": 32,
+        "k": 2.5
+      },
+      "segment": {
+        "kernel_size": 5,
+        "min_area": 50
+      },
+      "max_test_samples": 0,
+      "seed": 0
+    },
+    "features: glcm": {
+      "preprocess": {
+        "median_ksize": 3,
+        "gaussian_ksize": 0,
+        "gaussian_sigma": 1.0,
+        "contrast": "clahe",
+        "clahe_clip_limit": 2.0,
+        "clahe_grid": [
+          8,
+          8
+        ],
+        "illumination_sigma": 50.0,
+        "selvage_margin": 40
+      },
+      "patch": {
+        "size": 256,
+        "stride": 128,
+        "defect_min_pixels": 25
+      },
+      "glcm": {
+        "distances": [
+          1,
+          2,
+          3
+        ],
+        "angles_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "levels": 64,
+        "properties": [
+          "contrast",
+          "dissimilarity",
+          "homogeneity",
+          "energy",
+          "correlation"
+        ]
+      },
+      "lbp": {
+        "scales": [
+          [
+            8,
+            1
+          ],
+          [
+            16,
+            2
+          ]
+        ]
+      },
+      "gabor": {
+        "orientations_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "wavelengths": [
+          4.0,
+          8.0,
+          16.0
+        ],
+        "bandwidth": 1.0,
+        "gamma": 0.5
+      },
+      "features": {
+        "use": [
+          "glcm"
+        ]
+      },
+      "model": {
+        "scoring": "mahalanobis",
+        "regularization": 0.0001,
+        "k": 2.5,
+        "calibration_fraction": 0.25,
+        "reference": "per_fabric",
+        "ocsvm_nu": 0.1,
+        "iforest_trees": 200
+      },
+      "refine": {
+        "enabled": true,
+        "size": 64,
+        "stride": 32,
+        "k": 2.5
+      },
+      "segment": {
+        "kernel_size": 5,
+        "min_area": 50
+      },
+      "max_test_samples": 0,
+      "seed": 0
+    },
+    "features: lbp": {
+      "preprocess": {
+        "median_ksize": 3,
+        "gaussian_ksize": 0,
+        "gaussian_sigma": 1.0,
+        "contrast": "clahe",
+        "clahe_clip_limit": 2.0,
+        "clahe_grid": [
+          8,
+          8
+        ],
+        "illumination_sigma": 50.0,
+        "selvage_margin": 40
+      },
+      "patch": {
+        "size": 256,
+        "stride": 128,
+        "defect_min_pixels": 25
+      },
+      "glcm": {
+        "distances": [
+          1,
+          2,
+          3
+        ],
+        "angles_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "levels": 64,
+        "properties": [
+          "contrast",
+          "dissimilarity",
+          "homogeneity",
+          "energy",
+          "correlation"
+        ]
+      },
+      "lbp": {
+        "scales": [
+          [
+            8,
+            1
+          ],
+          [
+            16,
+            2
+          ]
+        ]
+      },
+      "gabor": {
+        "orientations_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "wavelengths": [
+          4.0,
+          8.0,
+          16.0
+        ],
+        "bandwidth": 1.0,
+        "gamma": 0.5
+      },
+      "features": {
+        "use": [
+          "lbp"
+        ]
+      },
+      "model": {
+        "scoring": "mahalanobis",
+        "regularization": 0.0001,
+        "k": 2.5,
+        "calibration_fraction": 0.25,
+        "reference": "per_fabric",
+        "ocsvm_nu": 0.1,
+        "iforest_trees": 200
+      },
+      "refine": {
+        "enabled": true,
+        "size": 64,
+        "stride": 32,
+        "k": 2.5
+      },
+      "segment": {
+        "kernel_size": 5,
+        "min_area": 50
+      },
+      "max_test_samples": 0,
+      "seed": 0
+    },
+    "features: gabor": {
+      "preprocess": {
+        "median_ksize": 3,
+        "gaussian_ksize": 0,
+        "gaussian_sigma": 1.0,
+        "contrast": "clahe",
+        "clahe_clip_limit": 2.0,
+        "clahe_grid": [
+          8,
+          8
+        ],
+        "illumination_sigma": 50.0,
+        "selvage_margin": 40
+      },
+      "patch": {
+        "size": 256,
+        "stride": 128,
+        "defect_min_pixels": 25
+      },
+      "glcm": {
+        "distances": [
+          1,
+          2,
+          3
+        ],
+        "angles_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "levels": 64,
+        "properties": [
+          "contrast",
+          "dissimilarity",
+          "homogeneity",
+          "energy",
+          "correlation"
+        ]
+      },
+      "lbp": {
+        "scales": [
+          [
+            8,
+            1
+          ],
+          [
+            16,
+            2
+          ]
+        ]
+      },
+      "gabor": {
+        "orientations_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "wavelengths": [
+          4.0,
+          8.0,
+          16.0
+        ],
+        "bandwidth": 1.0,
+        "gamma": 0.5
+      },
+      "features": {
+        "use": [
+          "gabor"
+        ]
+      },
+      "model": {
+        "scoring": "mahalanobis",
+        "regularization": 0.0001,
+        "k": 2.5,
+        "calibration_fraction": 0.25,
+        "reference": "per_fabric",
+        "ocsvm_nu": 0.1,
+        "iforest_trees": 200
+      },
+      "refine": {
+        "enabled": true,
+        "size": 64,
+        "stride": 32,
+        "k": 2.5
+      },
+      "segment": {
+        "kernel_size": 5,
+        "min_area": 50
+      },
+      "max_test_samples": 0,
+      "seed": 0
+    },
+    "features: glcm+lbp+gabor": {
+      "preprocess": {
+        "median_ksize": 3,
+        "gaussian_ksize": 0,
+        "gaussian_sigma": 1.0,
+        "contrast": "clahe",
+        "clahe_clip_limit": 2.0,
+        "clahe_grid": [
+          8,
+          8
+        ],
+        "illumination_sigma": 50.0,
+        "selvage_margin": 40
+      },
+      "patch": {
+        "size": 256,
+        "stride": 128,
+        "defect_min_pixels": 25
+      },
+      "glcm": {
+        "distances": [
+          1,
+          2,
+          3
+        ],
+        "angles_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "levels": 64,
+        "properties": [
+          "contrast",
+          "dissimilarity",
+          "homogeneity",
+          "energy",
+          "correlation"
+        ]
+      },
+      "lbp": {
+        "scales": [
+          [
+            8,
+            1
+          ],
+          [
+            16,
+            2
+          ]
+        ]
+      },
+      "gabor": {
+        "orientations_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "wavelengths": [
+          4.0,
+          8.0,
+          16.0
+        ],
+        "bandwidth": 1.0,
+        "gamma": 0.5
+      },
+      "features": {
+        "use": [
+          "glcm",
+          "lbp",
+          "gabor"
+        ]
+      },
+      "model": {
+        "scoring": "mahalanobis",
+        "regularization": 0.0001,
+        "k": 2.5,
+        "calibration_fraction": 0.25,
+        "reference": "per_fabric",
+        "ocsvm_nu": 0.1,
+        "iforest_trees": 200
+      },
+      "refine": {
+        "enabled": true,
+        "size": 64,
+        "stride": 32,
+        "k": 2.5
+      },
+      "segment": {
+        "kernel_size": 5,
+        "min_area": 50
+      },
+      "max_test_samples": 0,
+      "seed": 0
+    },
+    "scoring: strip mahalanobis": {
+      "preprocess": {
+        "median_ksize": 3,
+        "gaussian_ksize": 0,
+        "gaussian_sigma": 1.0,
+        "contrast": "clahe",
+        "clahe_clip_limit": 2.0,
+        "clahe_grid": [
+          8,
+          8
+        ],
+        "illumination_sigma": 50.0,
+        "selvage_margin": 40
+      },
+      "patch": {
+        "size": 256,
+        "stride": 128,
+        "defect_min_pixels": 25
+      },
+      "glcm": {
+        "distances": [
+          1,
+          2,
+          3
+        ],
+        "angles_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "levels": 64,
+        "properties": [
+          "contrast",
+          "dissimilarity",
+          "homogeneity",
+          "energy",
+          "correlation"
+        ]
+      },
+      "lbp": {
+        "scales": [
+          [
+            8,
+            1
+          ],
+          [
+            16,
+            2
+          ]
+        ]
+      },
+      "gabor": {
+        "orientations_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "wavelengths": [
+          4.0,
+          8.0,
+          16.0
+        ],
+        "bandwidth": 1.0,
+        "gamma": 0.5
+      },
+      "features": {
+        "use": [
+          "glcm",
+          "lbp"
+        ]
+      },
+      "model": {
+        "scoring": "strip_mahalanobis",
+        "regularization": 0.0001,
+        "k": 2.5,
+        "calibration_fraction": 0.25,
+        "reference": "per_fabric",
+        "ocsvm_nu": 0.1,
+        "iforest_trees": 200
+      },
+      "refine": {
+        "enabled": true,
+        "size": 64,
+        "stride": 32,
+        "k": 2.5
+      },
+      "segment": {
+        "kernel_size": 5,
+        "min_area": 50
+      },
+      "max_test_samples": 0,
+      "seed": 0
+    },
+    "scoring: hybrid (week 5)": {
+      "preprocess": {
+        "median_ksize": 3,
+        "gaussian_ksize": 0,
+        "gaussian_sigma": 1.0,
+        "contrast": "clahe",
+        "clahe_clip_limit": 2.0,
+        "clahe_grid": [
+          8,
+          8
+        ],
+        "illumination_sigma": 50.0,
+        "selvage_margin": 40
+      },
+      "patch": {
+        "size": 256,
+        "stride": 128,
+        "defect_min_pixels": 25
+      },
+      "glcm": {
+        "distances": [
+          1,
+          2,
+          3
+        ],
+        "angles_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "levels": 64,
+        "properties": [
+          "contrast",
+          "dissimilarity",
+          "homogeneity",
+          "energy",
+          "correlation"
+        ]
+      },
+      "lbp": {
+        "scales": [
+          [
+            8,
+            1
+          ],
+          [
+            16,
+            2
+          ]
+        ]
+      },
+      "gabor": {
+        "orientations_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "wavelengths": [
+          4.0,
+          8.0,
+          16.0
+        ],
+        "bandwidth": 1.0,
+        "gamma": 0.5
+      },
+      "features": {
+        "use": [
+          "glcm",
+          "lbp"
+        ]
+      },
+      "model": {
+        "scoring": "hybrid",
+        "regularization": 0.0001,
+        "k": 2.5,
+        "calibration_fraction": 0.25,
+        "reference": "per_fabric",
+        "ocsvm_nu": 0.1,
+        "iforest_trees": 200
+      },
+      "refine": {
+        "enabled": true,
+        "size": 64,
+        "stride": 32,
+        "k": 2.5
+      },
+      "segment": {
+        "kernel_size": 5,
+        "min_area": 50
+      },
+      "max_test_samples": 0,
+      "seed": 0
+    },
+    "scoring: relative": {
+      "preprocess": {
+        "median_ksize": 3,
+        "gaussian_ksize": 0,
+        "gaussian_sigma": 1.0,
+        "contrast": "clahe",
+        "clahe_clip_limit": 2.0,
+        "clahe_grid": [
+          8,
+          8
+        ],
+        "illumination_sigma": 50.0,
+        "selvage_margin": 40
+      },
+      "patch": {
+        "size": 256,
+        "stride": 128,
+        "defect_min_pixels": 25
+      },
+      "glcm": {
+        "distances": [
+          1,
+          2,
+          3
+        ],
+        "angles_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "levels": 64,
+        "properties": [
+          "contrast",
+          "dissimilarity",
+          "homogeneity",
+          "energy",
+          "correlation"
+        ]
+      },
+      "lbp": {
+        "scales": [
+          [
+            8,
+            1
+          ],
+          [
+            16,
+            2
+          ]
+        ]
+      },
+      "gabor": {
+        "orientations_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "wavelengths": [
+          4.0,
+          8.0,
+          16.0
+        ],
+        "bandwidth": 1.0,
+        "gamma": 0.5
+      },
+      "features": {
+        "use": [
+          "glcm",
+          "lbp"
+        ]
+      },
+      "model": {
+        "scoring": "relative",
+        "regularization": 0.0001,
+        "k": 2.5,
+        "calibration_fraction": 0.25,
+        "reference": "per_fabric",
+        "ocsvm_nu": 0.1,
+        "iforest_trees": 200
+      },
+      "refine": {
+        "enabled": true,
+        "size": 64,
+        "stride": 32,
+        "k": 2.5
+      },
+      "segment": {
+        "kernel_size": 5,
+        "min_area": 50
+      },
+      "max_test_samples": 0,
+      "seed": 0
+    },
+    "baseline: one-class svm": {
+      "preprocess": {
+        "median_ksize": 3,
+        "gaussian_ksize": 0,
+        "gaussian_sigma": 1.0,
+        "contrast": "clahe",
+        "clahe_clip_limit": 2.0,
+        "clahe_grid": [
+          8,
+          8
+        ],
+        "illumination_sigma": 50.0,
+        "selvage_margin": 40
+      },
+      "patch": {
+        "size": 256,
+        "stride": 128,
+        "defect_min_pixels": 25
+      },
+      "glcm": {
+        "distances": [
+          1,
+          2,
+          3
+        ],
+        "angles_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "levels": 64,
+        "properties": [
+          "contrast",
+          "dissimilarity",
+          "homogeneity",
+          "energy",
+          "correlation"
+        ]
+      },
+      "lbp": {
+        "scales": [
+          [
+            8,
+            1
+          ],
+          [
+            16,
+            2
+          ]
+        ]
+      },
+      "gabor": {
+        "orientations_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "wavelengths": [
+          4.0,
+          8.0,
+          16.0
+        ],
+        "bandwidth": 1.0,
+        "gamma": 0.5
+      },
+      "features": {
+        "use": [
+          "glcm",
+          "lbp"
+        ]
+      },
+      "model": {
+        "scoring": "ocsvm",
+        "regularization": 0.0001,
+        "k": 2.5,
+        "calibration_fraction": 0.25,
+        "reference": "per_fabric",
+        "ocsvm_nu": 0.1,
+        "iforest_trees": 200
+      },
+      "refine": {
+        "enabled": true,
+        "size": 64,
+        "stride": 32,
+        "k": 2.5
+      },
+      "segment": {
+        "kernel_size": 5,
+        "min_area": 50
+      },
+      "max_test_samples": 0,
+      "seed": 0
+    },
+    "baseline: isolation forest": {
+      "preprocess": {
+        "median_ksize": 3,
+        "gaussian_ksize": 0,
+        "gaussian_sigma": 1.0,
+        "contrast": "clahe",
+        "clahe_clip_limit": 2.0,
+        "clahe_grid": [
+          8,
+          8
+        ],
+        "illumination_sigma": 50.0,
+        "selvage_margin": 40
+      },
+      "patch": {
+        "size": 256,
+        "stride": 128,
+        "defect_min_pixels": 25
+      },
+      "glcm": {
+        "distances": [
+          1,
+          2,
+          3
+        ],
+        "angles_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "levels": 64,
+        "properties": [
+          "contrast",
+          "dissimilarity",
+          "homogeneity",
+          "energy",
+          "correlation"
+        ]
+      },
+      "lbp": {
+        "scales": [
+          [
+            8,
+            1
+          ],
+          [
+            16,
+            2
+          ]
+        ]
+      },
+      "gabor": {
+        "orientations_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "wavelengths": [
+          4.0,
+          8.0,
+          16.0
+        ],
+        "bandwidth": 1.0,
+        "gamma": 0.5
+      },
+      "features": {
+        "use": [
+          "glcm",
+          "lbp"
+        ]
+      },
+      "model": {
+        "scoring": "iforest",
+        "regularization": 0.0001,
+        "k": 2.5,
+        "calibration_fraction": 0.25,
+        "reference": "per_fabric",
+        "ocsvm_nu": 0.1,
+        "iforest_trees": 200
+      },
+      "refine": {
+        "enabled": true,
+        "size": 64,
+        "stride": 32,
+        "k": 2.5
+      },
+      "segment": {
+        "kernel_size": 5,
+        "min_area": 50
+      },
+      "max_test_samples": 0,
+      "seed": 0
+    },
+    "reference: global (fixed)": {
+      "preprocess": {
+        "median_ksize": 3,
+        "gaussian_ksize": 0,
+        "gaussian_sigma": 1.0,
+        "contrast": "clahe",
+        "clahe_clip_limit": 2.0,
+        "clahe_grid": [
+          8,
+          8
+        ],
+        "illumination_sigma": 50.0,
+        "selvage_margin": 40
+      },
+      "patch": {
+        "size": 256,
+        "stride": 128,
+        "defect_min_pixels": 25
+      },
+      "glcm": {
+        "distances": [
+          1,
+          2,
+          3
+        ],
+        "angles_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "levels": 64,
+        "properties": [
+          "contrast",
+          "dissimilarity",
+          "homogeneity",
+          "energy",
+          "correlation"
+        ]
+      },
+      "lbp": {
+        "scales": [
+          [
+            8,
+            1
+          ],
+          [
+            16,
+            2
+          ]
+        ]
+      },
+      "gabor": {
+        "orientations_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "wavelengths": [
+          4.0,
+          8.0,
+          16.0
+        ],
+        "bandwidth": 1.0,
+        "gamma": 0.5
+      },
+      "features": {
+        "use": [
+          "glcm",
+          "lbp"
+        ]
+      },
+      "model": {
+        "scoring": "mahalanobis",
+        "regularization": 0.0001,
+        "k": 2.5,
+        "calibration_fraction": 0.25,
+        "reference": "global",
+        "ocsvm_nu": 0.1,
+        "iforest_trees": 200
+      },
+      "refine": {
+        "enabled": true,
+        "size": 64,
+        "stride": 32,
+        "k": 2.5
+      },
+      "segment": {
+        "kernel_size": 5,
+        "min_area": 50
+      },
+      "max_test_samples": 0,
+      "seed": 0
+    },
+    "k = 2.0": {
+      "preprocess": {
+        "median_ksize": 3,
+        "gaussian_ksize": 0,
+        "gaussian_sigma": 1.0,
+        "contrast": "clahe",
+        "clahe_clip_limit": 2.0,
+        "clahe_grid": [
+          8,
+          8
+        ],
+        "illumination_sigma": 50.0,
+        "selvage_margin": 40
+      },
+      "patch": {
+        "size": 256,
+        "stride": 128,
+        "defect_min_pixels": 25
+      },
+      "glcm": {
+        "distances": [
+          1,
+          2,
+          3
+        ],
+        "angles_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "levels": 64,
+        "properties": [
+          "contrast",
+          "dissimilarity",
+          "homogeneity",
+          "energy",
+          "correlation"
+        ]
+      },
+      "lbp": {
+        "scales": [
+          [
+            8,
+            1
+          ],
+          [
+            16,
+            2
+          ]
+        ]
+      },
+      "gabor": {
+        "orientations_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "wavelengths": [
+          4.0,
+          8.0,
+          16.0
+        ],
+        "bandwidth": 1.0,
+        "gamma": 0.5
+      },
+      "features": {
+        "use": [
+          "glcm",
+          "lbp"
+        ]
+      },
+      "model": {
+        "scoring": "mahalanobis",
+        "regularization": 0.0001,
+        "k": 2.0,
+        "calibration_fraction": 0.25,
+        "reference": "per_fabric",
+        "ocsvm_nu": 0.1,
+        "iforest_trees": 200
+      },
+      "refine": {
+        "enabled": true,
+        "size": 64,
+        "stride": 32,
+        "k": 2.5
+      },
+      "segment": {
+        "kernel_size": 5,
+        "min_area": 50
+      },
+      "max_test_samples": 0,
+      "seed": 0
+    },
+    "k = 3.0": {
+      "preprocess": {
+        "median_ksize": 3,
+        "gaussian_ksize": 0,
+        "gaussian_sigma": 1.0,
+        "contrast": "clahe",
+        "clahe_clip_limit": 2.0,
+        "clahe_grid": [
+          8,
+          8
+        ],
+        "illumination_sigma": 50.0,
+        "selvage_margin": 40
+      },
+      "patch": {
+        "size": 256,
+        "stride": 128,
+        "defect_min_pixels": 25
+      },
+      "glcm": {
+        "distances": [
+          1,
+          2,
+          3
+        ],
+        "angles_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "levels": 64,
+        "properties": [
+          "contrast",
+          "dissimilarity",
+          "homogeneity",
+          "energy",
+          "correlation"
+        ]
+      },
+      "lbp": {
+        "scales": [
+          [
+            8,
+            1
+          ],
+          [
+            16,
+            2
+          ]
+        ]
+      },
+      "gabor": {
+        "orientations_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "wavelengths": [
+          4.0,
+          8.0,
+          16.0
+        ],
+        "bandwidth": 1.0,
+        "gamma": 0.5
+      },
+      "features": {
+        "use": [
+          "glcm",
+          "lbp"
+        ]
+      },
+      "model": {
+        "scoring": "mahalanobis",
+        "regularization": 0.0001,
+        "k": 3.0,
+        "calibration_fraction": 0.25,
+        "reference": "per_fabric",
+        "ocsvm_nu": 0.1,
+        "iforest_trees": 200
+      },
+      "refine": {
+        "enabled": true,
+        "size": 64,
+        "stride": 32,
+        "k": 2.5
+      },
+      "segment": {
+        "kernel_size": 5,
+        "min_area": 50
+      },
+      "max_test_samples": 0,
+      "seed": 0
+    },
+    "refine: off": {
+      "preprocess": {
+        "median_ksize": 3,
+        "gaussian_ksize": 0,
+        "gaussian_sigma": 1.0,
+        "contrast": "clahe",
+        "clahe_clip_limit": 2.0,
+        "clahe_grid": [
+          8,
+          8
+        ],
+        "illumination_sigma": 50.0,
+        "selvage_margin": 40
+      },
+      "patch": {
+        "size": 256,
+        "stride": 128,
+        "defect_min_pixels": 25
+      },
+      "glcm": {
+        "distances": [
+          1,
+          2,
+          3
+        ],
+        "angles_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "levels": 64,
+        "properties": [
+          "contrast",
+          "dissimilarity",
+          "homogeneity",
+          "energy",
+          "correlation"
+        ]
+      },
+      "lbp": {
+        "scales": [
+          [
+            8,
+            1
+          ],
+          [
+            16,
+            2
+          ]
+        ]
+      },
+      "gabor": {
+        "orientations_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "wavelengths": [
+          4.0,
+          8.0,
+          16.0
+        ],
+        "bandwidth": 1.0,
+        "gamma": 0.5
+      },
+      "features": {
+        "use": [
+          "glcm",
+          "lbp"
+        ]
+      },
+      "model": {
+        "scoring": "mahalanobis",
+        "regularization": 0.0001,
+        "k": 2.5,
+        "calibration_fraction": 0.25,
+        "reference": "per_fabric",
+        "ocsvm_nu": 0.1,
+        "iforest_trees": 200
+      },
+      "refine": {
+        "enabled": false,
+        "size": 64,
+        "stride": 32,
+        "k": 2.5
+      },
+      "segment": {
+        "kernel_size": 5,
+        "min_area": 50
+      },
+      "max_test_samples": 0,
+      "seed": 0
+    },
+    "week 5 setting": {
+      "preprocess": {
+        "median_ksize": 3,
+        "gaussian_ksize": 0,
+        "gaussian_sigma": 1.0,
+        "contrast": "clahe",
+        "clahe_clip_limit": 2.0,
+        "clahe_grid": [
+          8,
+          8
+        ],
+        "illumination_sigma": 50.0,
+        "selvage_margin": 40
+      },
+      "patch": {
+        "size": 256,
+        "stride": 128,
+        "defect_min_pixels": 25
+      },
+      "glcm": {
+        "distances": [
+          1,
+          2,
+          3
+        ],
+        "angles_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "levels": 64,
+        "properties": [
+          "contrast",
+          "dissimilarity",
+          "homogeneity",
+          "energy",
+          "correlation"
+        ]
+      },
+      "lbp": {
+        "scales": [
+          [
+            8,
+            1
+          ],
+          [
+            16,
+            2
+          ]
+        ]
+      },
+      "gabor": {
+        "orientations_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "wavelengths": [
+          4.0,
+          8.0,
+          16.0
+        ],
+        "bandwidth": 1.0,
+        "gamma": 0.5
+      },
+      "features": {
+        "use": [
+          "glcm",
+          "lbp"
+        ]
+      },
+      "model": {
+        "scoring": "hybrid",
+        "regularization": 0.0001,
+        "k": 2.5,
+        "calibration_fraction": 0.25,
+        "reference": "per_fabric",
+        "ocsvm_nu": 0.1,
+        "iforest_trees": 200
+      },
+      "refine": {
+        "enabled": false,
+        "size": 64,
+        "stride": 32,
+        "k": 2.5
+      },
+      "segment": {
+        "kernel_size": 5,
+        "min_area": 50
+      },
+      "max_test_samples": 0,
+      "seed": 0
+    }
+  }
+}

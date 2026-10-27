@@ -1,0 +1,71 @@
+# One-factor-at-a-time ablation around the default config
+# (Mahalanobis on GLCM+LBP, per-fabric reference, k = 2.5, 64x64 refinement).
+# Run: python -m fabric_defect ablate --grid Codes/configs/experiments/ablation.toml --workers 8
+# Every variant uses the same seed, so the same image-level fit / calibration split.
+
+base = "../default.toml"
+
+[[variant]]
+name = "default"
+
+# --- Descriptor ---------------------------------------------------------------
+[[variant]]
+name = "features: glcm"
+overrides = { features = { use = ["glcm"] } }
+
+[[variant]]
+name = "features: lbp"
+overrides = { features = { use = ["lbp"] } }
+
+[[variant]]
+name = "features: gabor"
+overrides = { features = { use = ["gabor"] } }
+
+[[variant]]
+name = "features: glcm+lbp+gabor"
+overrides = { features = { use = ["glcm", "lbp", "gabor"] } }
+
+# --- Scoring ------------------------------------------------------------------
+[[variant]]
+name = "scoring: strip mahalanobis"
+overrides = { model = { scoring = "strip_mahalanobis" } }
+
+[[variant]]
+name = "scoring: hybrid (week 5)"
+overrides = { model = { scoring = "hybrid" } }
+
+[[variant]]
+name = "scoring: relative"
+overrides = { model = { scoring = "relative" } }
+
+# --- Learned one-class baselines (same features, split and threshold rule) ----
+[[variant]]
+name = "baseline: one-class svm"
+overrides = { model = { scoring = "ocsvm" } }
+
+[[variant]]
+name = "baseline: isolation forest"
+overrides = { model = { scoring = "iforest" } }
+
+# --- Adaptive (per-fabric) vs fixed (global) reference and threshold ----------
+[[variant]]
+name = "reference: global (fixed)"
+overrides = { model = { reference = "global" } }
+
+# --- Threshold multiplier -----------------------------------------------------
+[[variant]]
+name = "k = 2.0"
+overrides = { model = { k = 2.0 } }
+
+[[variant]]
+name = "k = 3.0"
+overrides = { model = { k = 3.0 } }
+
+# --- Localization -------------------------------------------------------------
+[[variant]]
+name = "refine: off"
+overrides = { refine = { enabled = false } }
+
+[[variant]]
+name = "week 5 setting"
+overrides = { features = { use = ["glcm", "lbp"] }, model = { scoring = "hybrid" }, refine = { enabled = false } }

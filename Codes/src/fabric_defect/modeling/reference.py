@@ -1,0 +1,181 @@
+"""
+Reference Normal Texture Modeling and Deviation Scoring.
+ECE501 - Digital Image Processing (Group 15)
+
+Constructs statistical models of defect-free textile surfaces
+and calculates continuous texture-deviation maps for anomaly localization.
+"""
+
+import numpy as np
+from typing import Dict, List, Optional, Tuple
+
+from fabric_defect.core.config import ModelConfig
+from fabric_defect.modeling.segmentation import deviation_map
+
+
+def robust_z(scores: np.ndarray) -> np.ndarray:
+    """One-sided robust z-score: (s - median) / MAD, clipped at 0 (only "more anomalous" counts)."""
+    med = np.median(scores)
+    mad = np.median(np.abs(scores - med)) + 1e-4
+    return np.maximum(0.0, (scores - med) / mad).astype(np.float32)
+
+
+class TextureReferenceModel:
+    """
+    Models the distribution of normal, defect-free fabric texture
+    and computes statistical anomaly deviation scores for query patches.
+    """
+
+    def __init__(
+        self,
+        fabric_type: str,
+        cfg: ModelConfig = ModelConfig(),
+        metric: str = "mahalanobis"
+    ):
+        self.fabric_type = fabric_type
+        self.metric = metric
+        self.regularization = cfg.regularization
+        self.adaptive_k = cfg.k
+        self.scoring_method = cfg.scoring
+
+        self.mean_vector: Optional[np.ndarray] = None
+        self.covariance_matrix: Optional[np.ndarray] = None
+        self.inv_covariance: Optional[np.ndarray] = None
+        self.feature_std: Optional[np.ndarray] = None
+
+        # Baseline statistics on training normal patches
+        self.normal_score_mean: float = 0.0
+        self.normal_score_std: float = 1.0
+        self.adaptive_threshold: float = 2.5
+        self.calibrated_out_of_sample: bool = False
+        self.is_fitted: bool = False
+
+    def fit(self, X_normal: np.ndarray, X_calib: Optional[np.ndarray] = None) -> "TextureReferenceModel":
+        """
+        Fit reference model on feature vectors extracted from defect-free patches.
+
+        Args:
+            X_normal: Array of shape (N, D) from clean fabric samples (fits mu and Sigma).
+            X_calib: Optional patches from *other* defect-free images, used to set tau.
+                Without it tau is calibrated in-sample, which under-estimates the spread
+                of normal scores and so sets tau too low.
+        """
+        if len(X_normal) == 0:
+            raise ValueError("Cannot fit reference model with empty feature array.")
+
+        N, D = X_normal.shape
+        self.mean_vector = np.mean(X_normal, axis=0)
+        self.feature_std = np.std(X_normal, axis=0) + 1e-6
+
+        # Regularized Covariance
+        raw_cov = np.cov(X_normal, rowvar=False) if N > 1 else np.eye(D)
+        if raw_cov.ndim == 0:
+            raw_cov = np.array([[raw_cov]])
+
+        # Add Tikhonov regularization along diagonal for numerical stability
+        reg_cov = raw_cov + self.regularization * np.eye(D) * np.trace(raw_cov) / D
+        self.covariance_matrix = reg_cov
+
+        try:
+            self.inv_covariance = np.linalg.pinv(reg_cov)
+        except np.linalg.LinAlgError:
+            # Fallback to diagonal inverse if pinv encounters conditioning issues
+            self.inv_covariance = np.diag(1.0 / (np.var(X_normal, axis=0) + 1e-4))
+
+        self.is_fitted = True
+
+        # tau from held-out defect-free patches when available
+        self.calibrated_out_of_sample = X_calib is not None and len(X_calib) > 0
+        scores = self.score_batch(X_calib if self.calibrated_out_of_sample else X_normal)
+        self.normal_score_mean = float(np.mean(scores))
+        self.normal_score_std = float(np.std(scores)) + 1e-6
+        self.adaptive_threshold = self.normal_score_mean + self.adaptive_k * self.normal_score_std
+
+        return self
+
+    def score_patch(self, x: np.ndarray) -> float:
+        """Compute anomaly deviation score for a single feature vector."""
+        return float(self.score_batch(np.asarray(x)[None, :])[0])
+
+    def score_batch(self, X: np.ndarray) -> np.ndarray:
+        """Compute anomaly scores for a matrix of query patches (one matrix product, no Python loop)."""
+        if not self.is_fitted:
+            raise RuntimeError("Model must be fitted before scoring patches.")
+
+        delta = np.asarray(X) - self.mean_vector
+
+        if self.metric == "mahalanobis":
+            # Row-wise delta^T Sigma^+ delta
+            sq = np.einsum("ij,jk,ik->i", delta, self.inv_covariance, delta, optimize=True)
+        elif self.metric == "euclidean_norm":
+            # Normalized Euclidean (z-score distance)
+            sq = np.sum((delta / self.feature_std) ** 2, axis=1)
+        else:
+            sq = np.sum(delta ** 2, axis=1)
+
+        return np.sqrt(np.maximum(0.0, sq)).astype(np.float32)
+
+    def score_strip(
+        self,
+        X_strip: np.ndarray,
+        method: Optional[str] = None
+    ) -> Tuple[np.ndarray, float]:
+        """
+        Compute anomaly scores across an entire fabric strip.
+
+        Supports:
+        1. 'hybrid': Robust combination of within-strip spatial anomaly
+           (Median Absolute Deviation) and prototype Mahalanobis consistency.
+        2. 'relative': Pure within-strip robust outlier scoring.
+        3. 'mahalanobis': Cross-roll Mahalanobis distance against training distribution.
+        4. 'strip_mahalanobis': Mahalanobis distance, then a robust z-score within the strip.
+           Removes a strip-wide offset (acquisition shift between the defect-free and
+           defective AFID captures) while keeping the fabric model's notion of "normal".
+
+        Returns:
+            Tuple of (scores: np.ndarray, threshold: float)
+        """
+        if method is None:
+            method = self.scoring_method
+
+        if method == "mahalanobis":
+            scores = self.score_batch(X_strip)
+            return scores, float(self.adaptive_threshold)
+        if method == "strip_mahalanobis":
+            return robust_z(self.score_batch(X_strip)), float(self.adaptive_k)
+
+        # 1. Within-strip robust outlier scoring (MAD)
+        strip_med = np.median(X_strip, axis=0)
+        strip_mad = np.median(np.abs(X_strip - strip_med), axis=0)
+        strip_mad = np.maximum(strip_mad, 1e-4)
+
+        z_features = (X_strip - strip_med) / strip_mad
+        rel_scores = np.sqrt(np.sum(z_features ** 2, axis=1))
+
+        rel_med = np.median(rel_scores)
+        rel_mad = np.median(np.abs(rel_scores - rel_med)) + 1e-4
+        z_rel = np.maximum(0.0, (rel_scores - rel_med) / rel_mad)
+
+        if method == "relative":
+            threshold = float(self.adaptive_k)
+            return z_rel.astype(np.float32), threshold
+
+        # Default: 'hybrid'
+        proto_scores = self.score_batch(X_strip)
+        proto_med = np.median(proto_scores)
+        proto_mad = np.median(np.abs(proto_scores - proto_med)) + 1e-4
+        z_proto = np.maximum(0.0, (proto_scores - proto_med) / proto_mad)
+
+        hybrid_scores = (0.6 * z_rel + 0.4 * z_proto).astype(np.float32)
+        threshold = float(self.adaptive_k)
+        return hybrid_scores, threshold
+
+    def generate_deviation_map(
+        self,
+        patch_scores: np.ndarray,
+        coordinates: List[Tuple[int, int]],
+        strip_shape: Tuple[int, int],
+        patch_size: int = 256
+    ) -> np.ndarray:
+        """Patch scores spread back over the strip; see segmentation.deviation_map."""
+        return deviation_map(patch_scores, coordinates, strip_shape, patch_size)

@@ -1,7 +1,7 @@
 # Default pipeline configuration (mirrors the dataclass defaults in fabric_defect/config.py).
 # Any key may be removed; missing keys fall back to the defaults.
 
-max_test_samples = 14
+max_test_samples = 0     # 0 = every defective strip
 seed = 0
 
 [preprocess]
@@ -29,11 +29,29 @@ properties = ["contrast", "dissimilarity", "homogeneity", "energy", "correlation
 scales = [[8, 1], [16, 2]]  # (P, R) pairs, uniform riu2
 
 [model]
-scoring = "hybrid"        # hybrid | relative | mahalanobis
+scoring = "mahalanobis"   # mahalanobis | strip_mahalanobis | hybrid | relative | ocsvm | iforest
 regularization = 1e-4
 k = 2.5
-calibration_fraction = 0.25  # defect-free images held out per fabric to set tau
+ocsvm_nu = 0.1
+iforest_trees = 200
+calibration_fraction = 0.25
+reference = "per_fabric"  # per_fabric (adaptive) | global (one model + tau for all fabrics)  # defect-free images held out per fabric to set tau
+
+[refine]                  # 64x64 re-scoring inside flagged 256x256 patches
+enabled = true
+size = 64
+stride = 32
+k = 2.5
 
 [segment]
 kernel_size = 5
 min_area = 50
+
+[gabor]
+orientations_deg = [0.0, 45.0, 90.0, 135.0]
+wavelengths = [4.0, 8.0, 16.0]   # px
+bandwidth = 1.0                  # octaves
+gamma = 0.5
+
+[features]
+use = ["glcm", "lbp"]            # any of glcm, lbp, gabor (gabor did not help under Mahalanobis)

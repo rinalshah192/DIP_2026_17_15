@@ -10,7 +10,7 @@ Implements:
 5. Sliding-window patch extraction for image strips and ground-truth masks
 """
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -99,6 +99,11 @@ class Preprocessor:
             "filtered": filtered,
             "normalized": normalized
         }
+
+
+def window_coords(shape: Tuple[int, int], size: int, stride: int) -> List[Tuple[int, int]]:
+    """Top-left (y, x) of every window extract_patches would cut from an image of this shape."""
+    return [(y, x) for y in _window_starts(shape[0], size, stride) for x in _window_starts(shape[1], size, stride)]
 
 
 def _window_starts(length: int, size: int, stride: int) -> list:

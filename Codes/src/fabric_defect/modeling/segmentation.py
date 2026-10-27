@@ -15,6 +15,23 @@ from typing import Dict, Tuple, Optional
 from fabric_defect.core.config import SegmentConfig
 
 
+def deviation_map(
+    scores: np.ndarray,
+    coords,
+    shape: Tuple[int, int],
+    size: int
+) -> np.ndarray:
+    """Continuous heatmap (H x W): each pixel is the mean score of the windows covering it, 0 elsewhere."""
+    H, W = shape
+    heat = np.zeros((H, W), dtype=np.float32)
+    weight = np.zeros((H, W), dtype=np.float32)
+    for score, (y, x) in zip(scores, coords):
+        heat[y:y + size, x:x + size] += score
+        weight[y:y + size, x:x + size] += 1.0
+    weight[weight == 0] = 1.0
+    return heat / weight
+
+
 class DefectSegmenter:
     """Segments and localizes fabric surface defects from anomaly heatmaps."""
 

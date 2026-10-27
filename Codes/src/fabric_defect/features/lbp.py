@@ -3,7 +3,7 @@ Multi-scale rotation-invariant uniform LBP histograms.
 ECE501 - Digital Image Processing (Group 15)
 """
 
-from typing import List
+from typing import List, Sequence, Tuple
 
 import numpy as np
 from skimage.feature import local_binary_pattern
@@ -44,6 +44,22 @@ class LBPFeatureExtractor:
             hist_parts.append(norm_hist)
 
         return np.concatenate(hist_parts).astype(np.float32)
+
+    def extract_windows(self, img: np.ndarray, coords: Sequence[Tuple[int, int]], size: int) -> np.ndarray:
+        """Histograms of square windows (top-left (y, x)) of img.
+
+        The LBP codes are computed once for the whole image, so overlapping
+        windows share the work and border codes see their true neighbours.
+        """
+        maps = [(local_binary_pattern(img, P=P, R=R, method="uniform").astype(np.int64), P + 2)
+                for P, R in self.scales]
+        out = np.empty((len(coords), sum(n for _, n in maps)), dtype=np.float32)
+        for i, (y, x) in enumerate(coords):
+            out[i] = np.concatenate([
+                np.bincount(m[y:y + size, x:x + size].ravel(), minlength=n) / float(size * size)
+                for m, n in maps
+            ])
+        return out
 
     def extract_batch(self, patches: np.ndarray) -> np.ndarray:
         """

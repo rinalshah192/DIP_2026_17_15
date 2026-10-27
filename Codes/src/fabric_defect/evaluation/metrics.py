@@ -123,7 +123,7 @@ class EvaluationSuite:
     def to_dataframe(self) -> pd.DataFrame:
         return pd.DataFrame(self.records)
 
-    def summary_table(self) -> pd.DataFrame:
+    def summary_table(self, by: str = "fabric_type") -> pd.DataFrame:
         df = self.to_dataframe()
         if df.empty:
             return df
@@ -132,7 +132,7 @@ class EvaluationSuite:
             "patch_accuracy", "patch_precision", "patch_recall", "patch_f1",
             "pixel_iou", "pixel_dice", "pixel_precision", "pixel_recall"
         ]
-        groups = df.groupby(["fabric_type", "descriptor"])
+        groups = df.groupby([by, "descriptor"])
         summary = groups[metric_cols].mean().reset_index()  # pandas mean skips NaN
         summary.insert(2, "n_images", groups.size().values)
         return summary

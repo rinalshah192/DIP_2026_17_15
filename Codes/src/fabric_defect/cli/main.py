@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from fabric_defect.core.config import PipelineConfig
-from fabric_defect.core.paths import RAW_DATA_DIR, RESULTS_DIR
+from fabric_defect.core.paths import PROCESSED_DATA_DIR, RAW_DATA_DIR, RESULTS_DIR
 
 log = logging.getLogger("fabric_defect")
 
@@ -31,9 +31,13 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--synthetic", action="store_true",
                      help="generate and use synthetic strips (smoke test, not AFID results)")
     run.add_argument("--seed", type=int, default=None, help="override config seed")
-    run.add_argument("--max-test", type=int, default=None, help="override number of defective strips evaluated")
+    run.add_argument("--max-test", type=int, default=None, help="override number of defective strips evaluated (0 = all)")
     run.add_argument("--scoring", choices=["hybrid", "relative", "mahalanobis"], default=None,
                      help="override anomaly scoring method")
+    run.add_argument("--workers", type=int, default=1, help="processes for feature extraction (default 1)")
+    run.add_argument("--cache-dir", type=Path, default=PROCESSED_DATA_DIR,
+                     help=f"feature cache folder (default {PROCESSED_DATA_DIR})")
+    run.add_argument("--no-cache", action="store_true", help="always recompute features")
     run.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     return parser
 
@@ -59,7 +63,10 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     data_dir = args.data_dir or (args.out / "synthetic_data" if args.synthetic else RAW_DATA_DIR)
     try:
-        results = run_full_pipeline(cfg, data_dir=data_dir, out_dir=args.out, synthetic=args.synthetic)
+        # Synthetic strips are regenerated per run, so caching them only fills the cache
+        cache_dir = None if args.no_cache or args.synthetic else args.cache_dir
+        results = run_full_pipeline(cfg, data_dir=data_dir, out_dir=args.out, synthetic=args.synthetic,
+                                    cache_dir=cache_dir, workers=args.workers)
     except FileNotFoundError as exc:
         log.error("%s", exc)
         return 2

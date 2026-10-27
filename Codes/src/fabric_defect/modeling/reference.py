@@ -10,6 +10,7 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple
 
 from fabric_defect.core.config import ModelConfig
+from fabric_defect.modeling.segmentation import deviation_map
 
 
 class TextureReferenceModel:
@@ -164,30 +165,5 @@ class TextureReferenceModel:
         strip_shape: Tuple[int, int],
         patch_size: int = 256
     ) -> np.ndarray:
-        """
-        Reconstruct a 2D continuous deviation heatmap across the full fabric strip.
-
-        Args:
-            patch_scores: 1D array of anomaly scores per patch
-            coordinates: Top-left (y, x) position of each patch
-            strip_shape: (Height, Width) of the strip, e.g. (256, 4096)
-            patch_size: Size of patch (256)
-
-        Returns:
-            2D float32 array (H x W) containing the spatial anomaly heatmap
-        """
-        H, W = strip_shape
-        heatmap = np.zeros((H, W), dtype=np.float32)
-        weight_map = np.zeros((H, W), dtype=np.float32)
-
-        for score, (y, x) in zip(patch_scores, coordinates):
-            y_end = min(H, y + patch_size)
-            x_end = min(W, x + patch_size)
-
-            heatmap[y:y_end, x:x_end] += score
-            weight_map[y:y_end, x:x_end] += 1.0
-
-        # Average overlapping areas (e.g. from 50% stride)
-        weight_map[weight_map == 0] = 1.0
-        normalized_heatmap = heatmap / weight_map
-        return normalized_heatmap
+        """Patch scores spread back over the strip; see segmentation.deviation_map."""
+        return deviation_map(patch_scores, coordinates, strip_shape, patch_size)

@@ -1,7 +1,7 @@
 # Default pipeline configuration (mirrors the dataclass defaults in fabric_defect/config.py).
 # Any key may be removed; missing keys fall back to the defaults.
 
-max_test_samples = 14
+max_test_samples = 0     # 0 = every defective strip
 seed = 0
 
 [preprocess]

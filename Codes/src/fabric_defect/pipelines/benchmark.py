@@ -1,43 +1,39 @@
 """
-End-to-End Pipeline Runner for Fabric Surface Defect Detection.
+End-to-end benchmark run.
 ECE501 - Digital Image Processing (Group 15)
 
-Executes:
-1. Dataset ingestion / benchmark verification
-2. Pre-processing & Patch Extraction
-3. GLCM & Multi-Scale LBP Feature Extraction
-4. Normal Reference Modeling & Continuous Deviation Mapping
-5. Defect Localization & Morphological Refinement
-6. Standardized Evaluation Harness & Visual Artifact Generation
+catalog -> cached window features -> per-fabric reference models (fit set) ->
+thresholds (held-out calibration set) -> score, segment and evaluate every
+defective strip -> CSVs, run record and figures.
 """
 
 import json
 import logging
 import platform
 import subprocess
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from importlib.metadata import version
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 
 from fabric_defect.core.config import PipelineConfig
-from fabric_defect.core.paths import RAW_DATA_DIR, RESULTS_DIR
+from fabric_defect.core.paths import PROCESSED_DATA_DIR, RAW_DATA_DIR, RESULTS_DIR
 from fabric_defect.data.afid import AITEXDataset, load_mask
 from fabric_defect.data.synthetic import generate_synthetic_aitex_benchmark
-from fabric_defect.features.preprocessing import Preprocessor, detect_fabric_roi, extract_patches, load_image
-from fabric_defect.features.descriptor import TextureDescriptor
+from fabric_defect.evaluation.metrics import EvaluationSuite, evaluate_patch_classification, evaluate_pixel_localization
+from fabric_defect.features.cache import ImageFeatures, load_features
+from fabric_defect.features.preprocessing import Preprocessor, load_image
 from fabric_defect.modeling.reference import TextureReferenceModel
-from fabric_defect.modeling.segmentation import DefectSegmenter
+from fabric_defect.modeling.segmentation import DefectSegmenter, deviation_map
 from fabric_defect.visualization.plots import save_inspection_figure, save_summary_charts
-from fabric_defect.evaluation.metrics import (
-    evaluate_patch_classification,
-    evaluate_pixel_localization,
-    EvaluationSuite
-)
 
 log = logging.getLogger(__name__)
+
+N_FIGURES = 3  # inspection collages per run
 
 
 def _git_revision() -> dict:
@@ -51,7 +47,7 @@ def _git_revision() -> dict:
         return {"sha": None, "dirty": None}
 
 
-def write_run_info(out_dir: Path, cfg: PipelineConfig, data_dir: Path, synthetic: bool) -> Path:
+def write_run_info(out_dir: Path, cfg: PipelineConfig, data_dir: Path, synthetic: bool, **extra) -> Path:
     """Record everything needed to reproduce a run next to its results."""
     info = {
         "started_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -62,9 +58,10 @@ def write_run_info(out_dir: Path, cfg: PipelineConfig, data_dir: Path, synthetic
         "packages": {pkg: version(pkg) for pkg in
                      ("numpy", "opencv-python-headless", "scikit-image", "pandas", "matplotlib")},
         "config": cfg.to_dict(),
+        **extra,
     }
     path = Path(out_dir) / "run_config.json"
-    path.write_text(json.dumps(info, indent=2))
+    path.write_text(json.dumps(info, indent=2, default=str))
     return path
 
 
@@ -84,171 +81,186 @@ def split_images(paths, calibration_fraction, rng):
     return fit, calib
 
 
+def load_manifest(data_dir: Path, synthetic: bool) -> pd.DataFrame:
+    if synthetic:
+        log.warning("SYNTHETIC smoke run: results are not AFID results")
+        return generate_synthetic_aitex_benchmark(Path(data_dir), samples_per_type=2)
+    return AITEXDataset(data_dir).scan_catalog()
+
+
+def select_test(defect_images: pd.DataFrame, max_samples: int) -> pd.DataFrame:
+    """All defective strips (max_samples 0), or up to max_samples stratified across fabrics."""
+    if max_samples <= 0:
+        return defect_images
+    per_fabric = max(1, max_samples // max(1, defect_images["fabric_type"].nunique()))
+    # groupby().head keeps the fabric_type column (groupby().apply drops it on pandas >= 3)
+    return defect_images.groupby("fabric_type").head(per_fabric).head(max_samples)
+
+
+def feature_scales(cfg: PipelineConfig) -> List[Tuple[int, int]]:
+    return [(cfg.patch.size, cfg.patch.stride)]
+
+
+@dataclass
+class Split:
+    fit: Dict[str, List[str]]  # fabric -> defect-free image paths used to fit
+    calib: Dict[str, List[str]]  # fabric -> held-out defect-free paths used to set tau
+
+
+def split_by_fabric(clean: pd.DataFrame, cfg: PipelineConfig) -> Split:
+    """Seeded per-fabric fit/calibration split; identical for every variant of one seed."""
+    rng = np.random.default_rng(cfg.seed)
+    fit, calib = {}, {}
+    for fabric in sorted(clean["fabric_type"].unique()):
+        paths = clean.loc[clean["fabric_type"] == fabric, "image_path"].tolist()
+        fit[fabric], calib[fabric] = split_images(paths, cfg.model.calibration_fraction, rng)
+    return Split(fit=fit, calib=calib)
+
+
+def stack(feats: Dict[str, ImageFeatures], paths: List[str], size: int, use) -> Optional[np.ndarray]:
+    """Descriptor rows of all windows of the given images, or None if there are none."""
+    rows = [np.hstack([feats[p].blocks[size][b] for b in use]) for p in paths]
+    rows = [r for r in rows if len(r)]
+    return np.vstack(rows) if rows else None
+
+
+def fit_models(feats: Dict[str, ImageFeatures], split: Split, cfg: PipelineConfig) -> Dict[str, TextureReferenceModel]:
+    """One reference model per fabric, fitted on the fit images and calibrated on the held-out ones."""
+    size, use = cfg.patch.size, cfg.features.use
+    models = {}
+    for fabric, fit_paths in split.fit.items():
+        X_fit = stack(feats, fit_paths, size, use)
+        if X_fit is None:
+            log.warning("%s: no usable defect-free patches, fabric skipped", fabric)
+            continue
+        X_cal = stack(feats, split.calib[fabric], size, use)
+        model = TextureReferenceModel(fabric_type=fabric, cfg=cfg.model).fit(X_fit, X_cal)
+        source = (f"{len(split.calib[fabric])} held-out images" if model.calibrated_out_of_sample
+                  else "in-sample (too few images)")
+        log.debug("%s: fit on %d images / %d patches; tau = %.3f from %s",
+                  fabric, len(fit_paths), len(X_fit), model.adaptive_threshold, source)
+        models[fabric] = model
+    return models
+
+
+@dataclass
+class StripResult:
+    """Everything evaluate() computed for one strip; kept only for figures."""
+
+    row: dict
+    heatmap: np.ndarray
+    gt_mask: np.ndarray
+    pred_mask: np.ndarray
+    threshold: float
+
+
+def evaluate(
+    test: pd.DataFrame,
+    feats: Dict[str, ImageFeatures],
+    models: Dict[str, TextureReferenceModel],
+    cfg: PipelineConfig,
+    keep: int = 0
+) -> Tuple[pd.DataFrame, List[StripResult]]:
+    """Score, segment and measure every test strip; returns per-image metrics and `keep` strips for figures."""
+    size, use = cfg.patch.size, cfg.features.use
+    segmenter = DefectSegmenter(cfg.segment, method="adaptive", adaptive_k=cfg.model.k)
+    suite, kept = EvaluationSuite(), []
+    label = f"{'+'.join(use)} ({cfg.model.scoring})"
+
+    for row in test.to_dict("records"):
+        name, fabric = row["filename"], row["fabric_type"]
+        model = models.get(fabric)
+        if model is None:
+            log.warning("Skipping %s: no reference model for %s", name, fabric)
+            continue
+        if not row["mask_paths"]:
+            # An empty ground truth would silently score every detection as a false positive
+            log.warning("Skipping %s: no ground-truth mask found", name)
+            continue
+        f = feats[row["image_path"]]
+        if len(f.coords[size]) == 0:
+            log.warning("Skipping %s: fabric ROI smaller than one patch", name)
+            continue
+        gt = load_mask(row["mask_paths"], f.shape)
+        if not gt.any():
+            log.warning("%s: ground-truth mask is empty; recall-type metrics will be NaN", name)
+
+        X = np.hstack([f.blocks[size][b] for b in use])
+        scores, tau = model.score_strip(X)
+        heat = deviation_map(scores, f.coords[size], f.shape, size)
+        pred = segmenter.segment(heat, reference_threshold=tau)["cleaned_mask"]
+
+        labels = [int(np.count_nonzero(gt[y:y + size, x:x + size]) > cfg.patch.defect_min_pixels)
+                  for y, x in f.coords[size]]
+        suite.log_result(
+            sample_id=name, fabric_type=fabric, defect_type=row["defect_type"],
+            patch_metrics=evaluate_patch_classification(labels, (scores >= tau).astype(int)),
+            pixel_metrics=evaluate_pixel_localization(pred, gt),
+            descriptor_used=label,
+        )
+        if len(kept) < keep and gt.any():
+            kept.append(StripResult(row, heat, gt, pred, tau))
+    return suite.to_dataframe(), kept
+
+
 def run_full_pipeline(
     cfg: PipelineConfig = PipelineConfig(),
     data_dir: Path = RAW_DATA_DIR,
     out_dir: Path = RESULTS_DIR,
-    synthetic: bool = False
+    synthetic: bool = False,
+    cache_dir: Optional[Path] = PROCESSED_DATA_DIR,
+    workers: int = 1
 ) -> pd.DataFrame:
-    # 1. Dataset
-    if synthetic:
-        log.warning("SYNTHETIC smoke run: results are not AFID results")
-        manifest = generate_synthetic_aitex_benchmark(Path(data_dir), samples_per_type=2)
-    else:
-        manifest = AITEXDataset(data_dir).scan_catalog()
-
+    manifest = load_manifest(data_dir, synthetic)
     out_dir = Path(out_dir)
     figures_dir = out_dir / "figures"
     figures_dir.mkdir(parents=True, exist_ok=True)
     log.info("Saved %s", write_run_info(out_dir, cfg, Path(data_dir), synthetic))
 
-    clean_images = manifest[~manifest["is_defective"]]
-    defect_images = manifest[manifest["is_defective"]]
-    log.info("Catalogued %d images: %d defect-free, %d defective",
-             len(manifest), len(clean_images), len(defect_images))
+    clean = manifest[~manifest["is_defective"]]
+    test = select_test(manifest[manifest["is_defective"]], cfg.max_test_samples)
+    log.info("Catalogued %d images: %d defect-free; testing %d defective strips",
+             len(manifest), len(clean), len(test))
 
-    # 2. Engines
-    preprocessor = Preprocessor(cfg.preprocess)
-    descriptor = TextureDescriptor(cfg.glcm, cfg.lbp, cfg.gabor, cfg.features)
-    segmenter = DefectSegmenter(cfg.segment, method="adaptive", adaptive_k=cfg.model.k)
-    eval_suite = EvaluationSuite()
-    psize, stride = cfg.patch.size, cfg.patch.stride
+    split = split_by_fabric(clean, cfg)
+    feats = load_features(clean["image_path"].tolist() + test["image_path"].tolist(),
+                          cfg, feature_scales(cfg), cache_dir, workers)
+    models = fit_models(feats, split, cfg)
+    results, kept = evaluate(test, feats, models, cfg, keep=N_FIGURES)
+    return write_results(results, kept, cfg, out_dir, synthetic)
 
-    def roi(img):
-        return detect_fabric_roi(img, margin=cfg.preprocess.selvage_margin, min_width=psize)
 
-    # 3. Fit reference models per fabric type (on the genuine fabric ROI)
-    log.info("Phase 1: fitting per-fabric reference models")
-    reference_models = {}
-
-    def image_features(paths):
-        feats = []
-        for path in paths:
-            img = load_image(path)
-            c0, c1 = roi(img)
-            proc = preprocessor.process(img[:, c0:c1])["normalized"]
-            patches = extract_patches(proc, patch_size=psize, stride=stride)["patches"]
-            if len(patches):
-                feats.append(descriptor.extract_batch(patches))
-        return np.vstack(feats) if feats else None
-
-    rng = np.random.default_rng(cfg.seed)
-    for fabric_name in sorted(clean_images["fabric_type"].unique()):
-        paths = clean_images.loc[clean_images["fabric_type"] == fabric_name, "image_path"].tolist()
-        fit_paths, calib_paths = split_images(paths, cfg.model.calibration_fraction, rng)
-
-        X_fit = image_features(fit_paths)
-        if X_fit is None:
-            log.warning("%s: no usable defect-free patches, fabric skipped", fabric_name)
-            continue
-        X_calib = image_features(calib_paths)
-
-        ref_model = TextureReferenceModel(fabric_type=fabric_name, cfg=cfg.model).fit(X_fit, X_calib)
-        reference_models[fabric_name] = ref_model
-        source = f"{len(calib_paths)} held-out images" if ref_model.calibrated_out_of_sample else "in-sample (too few images)"
-        log.info("%s: fit on %d images / %d patches; tau = %.3f from %s",
-                 fabric_name, len(fit_paths), len(X_fit), ref_model.adaptive_threshold, source)
-
-    # 4. Evaluate test strips, stratified across fabric types
-    log.info("Phase 2: detection and localization on test strips")
-    unique_fabrics = defect_images["fabric_type"].unique()
-    samples_per_type = max(1, cfg.max_test_samples // max(1, len(unique_fabrics)))
-    # groupby().head keeps the fabric_type column (groupby().apply drops it on pandas >= 3)
-    test_subset = defect_images.groupby("fabric_type").head(samples_per_type).head(cfg.max_test_samples)
-    log.info("Testing %d strips stratified across %d fabrics", len(test_subset), len(unique_fabrics))
-    visualized_count = 0
-
-    for _, row in test_subset.iterrows():
-        mask_paths = row["mask_paths"]
-        fabric_name = row["fabric_type"]
-        defect_name = row["defect_type"]
-        filename = row["filename"]
-
-        ref_model = reference_models.get(fabric_name)
-        if ref_model is None:
-            log.warning("Skipping %s: no reference model for %s", filename, fabric_name)
-            continue
-        if not mask_paths:
-            # An empty ground truth would silently score every detection as a false positive
-            log.warning("Skipping %s: no ground-truth mask found", filename)
-            continue
-
-        raw_img = load_image(row["image_path"])
-        gt_mask = load_mask(mask_paths, raw_img.shape)
-        if not gt_mask.any():
-            log.warning("%s: ground-truth mask is empty; recall-type metrics will be NaN", filename)
-
-        # ROI crop (drops conveyor padding and selvage edge), then preprocessing
-        c0, c1 = roi(raw_img)
-        norm_crop = preprocessor.process(raw_img[:, c0:c1])["normalized"]
-        norm_img = np.full_like(raw_img, 255)
-        norm_img[:, c0:c1] = norm_crop
-
-        patch_dict = extract_patches(
-            norm_crop, mask=gt_mask[:, c0:c1], patch_size=psize, stride=stride,
-            offset_x=c0, defect_min_pixels=cfg.patch.defect_min_pixels
-        )
-        patches = patch_dict["patches"]
-        if len(patches) == 0:
-            log.warning("Skipping %s: fabric ROI smaller than one patch", filename)
-            continue
-
-        # Scoring, deviation heatmap, segmentation
-        patch_scores, adaptive_thresh = ref_model.score_strip(descriptor.extract_batch(patches))
-        heatmap = ref_model.generate_deviation_map(
-            patch_scores,
-            coordinates=patch_dict["coordinates"],
-            strip_shape=raw_img.shape,
-            patch_size=psize
-        )
-        pred_mask = segmenter.segment(heatmap, reference_threshold=adaptive_thresh)["cleaned_mask"]
-        pred_patch_labels = (patch_scores >= adaptive_thresh).astype(int)
-
-        eval_suite.log_result(
-            sample_id=filename,
-            fabric_type=fabric_name,
-            defect_type=defect_name,
-            patch_metrics=evaluate_patch_classification(patch_dict["labels"], pred_patch_labels),
-            pixel_metrics=evaluate_pixel_localization(pred_mask, gt_mask),
-            descriptor_used=f"GLCM+LBP ({cfg.model.scoring})"
-        )
-
-        # Visual collage for the first 3 defective strips
-        if visualized_count < 3 and np.count_nonzero(gt_mask) > 0:
-            fig_path = save_inspection_figure(
-                out_file=figures_dir / f"inspection_{Path(filename).stem}.png",
-                sample_id=Path(filename).stem,
-                raw_img=raw_img,
-                norm_img=norm_img,
-                heatmap=heatmap,
-                gt_mask=gt_mask,
-                pred_mask=pred_mask,
-                threshold=adaptive_thresh,
-                defect_type=defect_name,
-                fabric_type=fabric_name
-            )
-            log.info("Saved %s", fig_path)
-            visualized_count += 1
-
-    # 5. Outputs
-    results_df = eval_suite.to_dataframe()
-    results_csv = out_dir / "metrics_summary.csv"
-    results_df.to_csv(results_csv, index=False)
-    log.info("Saved %s", results_csv)
-    eval_suite.summary_table().to_csv(out_dir / "fabric_summary.csv", index=False)
-
-    if results_df.empty:
+def write_results(results: pd.DataFrame, kept: List[StripResult], cfg: PipelineConfig,
+                  out_dir: Path, synthetic: bool) -> pd.DataFrame:
+    figures_dir = Path(out_dir) / "figures"
+    results.to_csv(out_dir / "metrics_summary.csv", index=False)
+    if results.empty:
         log.error("No test strips were evaluated")
-        return results_df
+        return results
+
+    suite = EvaluationSuite()
+    suite.records = results.to_dict("records")
+    suite.summary_table("fabric_type").to_csv(out_dir / "fabric_summary.csv", index=False)
+    suite.summary_table("defect_type").to_csv(out_dir / "defect_summary.csv", index=False)
+    log.info("Saved metrics to %s", out_dir)
+
+    preprocessor = Preprocessor(cfg.preprocess)
+    for s in kept:
+        raw = load_image(s.row["image_path"])
+        norm = preprocessor.process(raw)["normalized"]
+        stem = Path(s.row["filename"]).stem
+        save_inspection_figure(
+            out_file=figures_dir / f"inspection_{stem}.png", sample_id=stem, raw_img=raw, norm_img=norm,
+            heatmap=s.heatmap, gt_mask=s.gt_mask, pred_mask=s.pred_mask, threshold=s.threshold,
+            defect_type=s.row["defect_type"], fabric_type=s.row["fabric_type"],
+        )
 
     log.info(
         "Summary%s over %d strips (NaN-skipping means): patch acc %.2f%%, patch F1 %.2f%%, "
         "pixel IoU %.2f%%, pixel Dice %.2f%%",
-        " (SYNTHETIC)" if synthetic else "", len(results_df),
-        results_df["patch_accuracy"].mean() * 100, results_df["patch_f1"].mean() * 100,
-        results_df["pixel_iou"].mean() * 100, results_df["pixel_dice"].mean() * 100
+        " (SYNTHETIC)" if synthetic else "", len(results),
+        results["patch_accuracy"].mean() * 100, results["patch_f1"].mean() * 100,
+        results["pixel_iou"].mean() * 100, results["pixel_dice"].mean() * 100
     )
-
-    chart = save_summary_charts(results_df, figures_dir / "benchmark_performance_charts.png")
-    log.info("Saved %s", chart)
-    return results_df
+    save_summary_charts(results, figures_dir / "benchmark_performance_charts.png")
+    return results

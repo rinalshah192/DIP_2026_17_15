@@ -6,7 +6,7 @@ Contrast, dissimilarity, homogeneity, energy and correlation, as mean and
 std across orientations for each pixel distance.
 """
 
-from typing import List
+from typing import List, Sequence, Tuple
 
 import numpy as np
 from skimage.feature import graycomatrix, graycoprops
@@ -70,6 +70,11 @@ class GLCMFeatureExtractor:
             features.extend(std_over_angles.tolist())
 
         return np.array(features, dtype=np.float32)
+
+    def extract_windows(self, img: np.ndarray, coords: Sequence[Tuple[int, int]], size: int) -> np.ndarray:
+        """Features of square windows (top-left (y, x)) of img."""
+        out = [self.extract_patch(img[y:y + size, x:x + size]) for y, x in coords]
+        return np.array(out, dtype=np.float32).reshape(len(coords), -1)
 
     def extract_batch(self, patches: np.ndarray) -> np.ndarray:
         """

@@ -108,7 +108,7 @@ class PipelineConfig:
     features: FeatureConfig = field(default_factory=FeatureConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
     segment: SegmentConfig = field(default_factory=SegmentConfig)
-    max_test_samples: int = 14
+    max_test_samples: int = 0  # 0 = every defective strip; n = n strips stratified by fabric
     seed: int = 0
 
     @classmethod

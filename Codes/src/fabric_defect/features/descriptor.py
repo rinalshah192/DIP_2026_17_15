@@ -3,7 +3,7 @@ Fused patch descriptor.
 ECE501 - Digital Image Processing (Group 15)
 """
 
-from typing import List
+from typing import Dict, List, Sequence, Tuple
 
 import numpy as np
 
@@ -32,6 +32,14 @@ class TextureDescriptor:
             "lbp": LBPFeatureExtractor(lbp),
             "gabor": GaborFeatureExtractor(gabor),
         }
+
+    def extract_blocks(self, img: np.ndarray, coords: Sequence[Tuple[int, int]], size: int) -> Dict[str, np.ndarray]:
+        """Every block (not just the used ones) for windows of img; what the feature cache stores."""
+        return {name: ex.extract_windows(img, coords, size) for name, ex in self.extractors.items()}
+
+    def stack(self, blocks: Dict[str, np.ndarray]) -> np.ndarray:
+        """The descriptor matrix from cached blocks, using this descriptor's block selection."""
+        return np.hstack([blocks[b] for b in self.use])
 
     def extract_batch(self, patches: np.ndarray) -> np.ndarray:
         return np.hstack([self.extractors[b].extract_batch(patches) for b in self.use])

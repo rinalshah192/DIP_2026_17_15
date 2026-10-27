@@ -60,6 +60,8 @@ def test_catalog_scans_published_layout(tmp_path):
     cv2.imwrite(str(tmp_path / "Defect_images" / "0094_027_05.png"), img)
     cv2.imwrite(str(tmp_path / "Defect_images" / "0095_027_05.png"), img)  # no mask on purpose
     cv2.imwrite(str(tmp_path / "Mask_images" / "0094_027_05_mask.png"), img)
+    # Real AFID quirk: a 2-digit defect code in the defect-free folder
+    cv2.imwrite(str(tmp_path / "NODefect_images" / "2306881-210020u" / "0018_00_05.png"), img)
 
     df = AITEXDataset(tmp_path).scan_catalog().set_index("filename")
     assert df.loc["0001_000_05.png", "is_defective"] == False  # noqa: E712 (numpy bool)
@@ -67,3 +69,4 @@ def test_catalog_scans_published_layout(tmp_path):
     assert df.loc["0094_027_05.png", "fabric_type"] == "fabric_05"
     assert len(df.loc["0094_027_05.png", "mask_paths"]) == 1
     assert df.loc["0095_027_05.png", "mask_paths"] == []
+    assert "0018_00_05.png" not in df.index

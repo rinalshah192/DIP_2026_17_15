@@ -9,6 +9,7 @@ Provides:
 3. Multi-part ground-truth mask loading.
 """
 
+import logging
 import re
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -17,6 +18,8 @@ import numpy as np
 import pandas as pd
 
 from fabric_defect.core.paths import RAW_DATA_DIR
+
+log = logging.getLogger(__name__)
 
 # AFID line-scan strips are 256 rows (fabric travel) x 4096 columns (fabric width)
 STRIP_HEIGHT = 256
@@ -74,6 +77,10 @@ class AITEXDataset:
         records = []
         # Defect-free images sit in per-fabric sub-folders
         for f in sorted(self.normal_dir.rglob("*.png")):
+            if parse_afid_filename(f.name) is None:
+                # AFID ships one such file: NODefect_images/2608691-202020u/0018_00_01.png
+                log.warning("Skipping %s: not an nnnn_ddd_ff AFID filename", f.name)
+                continue
             records.append({
                 "image_path": str(f),
                 "mask_paths": [],
@@ -83,6 +90,9 @@ class AITEXDataset:
                 "filename": f.name
             })
         for f in sorted(self.defect_dir.glob("*.png")):
+            if parse_afid_filename(f.name) is None:
+                log.warning("Skipping %s: not an nnnn_ddd_ff AFID filename", f.name)
+                continue
             records.append({
                 "image_path": str(f),
                 "mask_paths": find_masks(self.mask_dir, f.stem),

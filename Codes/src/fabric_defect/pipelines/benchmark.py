@@ -142,8 +142,15 @@ def fit_models(
     cfg: PipelineConfig,
     size: Optional[int] = None
 ) -> Dict[str, TextureReferenceModel]:
-    """One reference model per fabric, fitted on the fit images and calibrated on the held-out ones."""
+    """One model per fabric (or one shared by all fabrics when model.reference is "global"),
+    fitted on the fit images and calibrated on the held-out ones."""
     size, use = size or cfg.patch.size, cfg.features.use
+    if cfg.model.reference == "global":
+        # Fixed baseline: pool every fabric's fit and calibration images into one model and one tau
+        pooled = Split(fit={"*": [p for v in split.fit.values() for p in v]},
+                       calib={"*": [p for v in split.calib.values() for p in v]})
+        shared = fit_models(feats, pooled, replace(cfg, model=replace(cfg.model, reference="per_fabric")), size)
+        return {fabric: shared["*"] for fabric in split.fit} if "*" in shared else {}
     models = {}
     for fabric, fit_paths in split.fit.items():
         X_fit = stack(feats, fit_paths, size, use)

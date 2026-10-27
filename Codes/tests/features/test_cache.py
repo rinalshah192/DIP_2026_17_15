@@ -31,7 +31,7 @@ def test_cache_round_trip_and_parallel_match(tmp_path):
     paths, cache = _strips(tmp_path), tmp_path / "cache"
     first = load_features(paths, PipelineConfig(), [(256, 128), (64, 32)], cache, workers=2)
     files = list(cache.glob("features-*/*.npz"))
-    assert len(files) == 3
+    assert len(files) == 6  # one per image and scale
     again = load_features(paths, PipelineConfig(), [(256, 128), (64, 32)], cache, workers=1)
     for p in paths:
         for s in (256, 64):
@@ -47,3 +47,6 @@ def test_feature_settings_get_their_own_cache(tmp_path):
     model_only = replace(PipelineConfig(), seed=7)  # modelling settings must reuse the cache
     load_features(paths, model_only, [(256, 128)], cache)
     assert len(list(cache.glob("features-*"))) == 2
+    assert len(list(cache.glob("features-*/*.npz"))) == 2
+    load_features(paths, model_only, [(256, 128), (64, 32)], cache)  # adds only the new scale
+    assert len(list(cache.glob("features-*/*.npz"))) == 3

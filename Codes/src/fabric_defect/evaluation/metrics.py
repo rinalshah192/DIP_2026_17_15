@@ -91,6 +91,19 @@ def evaluate_pixel_localization(
     }
 
 
+SUMMARY_METRICS = (
+    "patch_accuracy", "patch_precision", "patch_recall", "patch_f1", "patch_specificity",
+    "pixel_iou", "pixel_dice", "pixel_precision", "pixel_recall",
+)
+
+
+def summarize(df: pd.DataFrame) -> Dict[str, float]:
+    """NaN-skipping means of the per-image metrics, plus how many images were evaluated."""
+    out = {"n_images": int(len(df))}
+    out.update({m: float(df[m].mean()) if len(df) else float("nan") for m in SUMMARY_METRICS})
+    return out
+
+
 def _ratio(num: float, den: float) -> float:
     return float(num) / float(den) if den > 0 else float("nan")
 

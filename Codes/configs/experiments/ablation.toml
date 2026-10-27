@@ -1,0 +1,69 @@
+# One-factor-at-a-time ablation around the default config.
+# Run: python -m fabric_defect ablate --grid Codes/configs/experiments/ablation.toml --workers 8
+# Every variant uses the same seed, so the same image-level fit / calibration split.
+
+base = "../default.toml"
+
+[[variant]]
+name = "default"
+
+# --- Descriptor ---------------------------------------------------------------
+[[variant]]
+name = "features: glcm"
+overrides = { features = { use = ["glcm"] } }
+
+[[variant]]
+name = "features: lbp"
+overrides = { features = { use = ["lbp"] } }
+
+[[variant]]
+name = "features: gabor"
+overrides = { features = { use = ["gabor"] } }
+
+[[variant]]
+name = "features: glcm+lbp+gabor"
+overrides = { features = { use = ["glcm", "lbp", "gabor"] } }
+
+# --- Scoring (incl. learned one-class baselines) ------------------------------
+[[variant]]
+name = "scoring: hybrid"
+overrides = { model = { scoring = "hybrid" } }
+
+[[variant]]
+name = "scoring: relative"
+overrides = { model = { scoring = "relative" } }
+
+[[variant]]
+name = "scoring: mahalanobis"
+overrides = { model = { scoring = "mahalanobis" } }
+
+[[variant]]
+name = "baseline: one-class svm"
+overrides = { model = { scoring = "ocsvm" } }
+
+[[variant]]
+name = "baseline: isolation forest"
+overrides = { model = { scoring = "iforest" } }
+
+# --- Adaptive (per-fabric) vs fixed (global) reference and threshold ----------
+[[variant]]
+name = "reference: global"
+overrides = { model = { reference = "global" } }
+
+# --- Threshold multiplier -----------------------------------------------------
+[[variant]]
+name = "k = 2.0"
+overrides = { model = { k = 2.0 } }
+
+[[variant]]
+name = "k = 3.0"
+overrides = { model = { k = 3.0 } }
+
+# --- Localization -------------------------------------------------------------
+[[variant]]
+name = "refine: off"
+overrides = { refine = { enabled = false } }
+
+[[variant]]
+name = "refine: on"
+overrides = { refine = { enabled = true } }

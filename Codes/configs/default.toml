@@ -34,7 +34,8 @@ regularization = 1e-4
 k = 2.5
 ocsvm_nu = 0.1
 iforest_trees = 200
-calibration_fraction = 0.25  # defect-free images held out per fabric to set tau
+calibration_fraction = 0.25
+reference = "per_fabric"  # per_fabric (adaptive) | global (one model + tau for all fabrics)  # defect-free images held out per fabric to set tau
 
 [refine]                  # 64x64 re-scoring inside flagged 256x256 patches
 enabled = false

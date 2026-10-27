@@ -82,12 +82,15 @@ class ModelConfig:
     regularization: float = 1e-4  # lambda in Sigma + lambda * tr(Sigma)/D * I
     k: float = 2.5  # tau = mu + k * sigma (mahalanobis) or robust-z cut-off (hybrid/relative)
     calibration_fraction: float = 0.25  # share of defect-free images held out to calibrate tau
+    reference: str = "per_fabric"  # "per_fabric" (adaptive: one model and tau per fabric) or "global" (fixed)
     ocsvm_nu: float = 0.1  # One-Class SVM: upper bound on the training outlier fraction
     iforest_trees: int = 200
 
     def __post_init__(self):
         if self.scoring not in ("hybrid", "relative", "mahalanobis", "ocsvm", "iforest"):
             raise ValueError(f"unknown scoring method {self.scoring!r}")
+        if self.reference not in ("per_fabric", "global"):
+            raise ValueError(f"unknown reference {self.reference!r}")
         if self.k <= 0:
             raise ValueError("k must be positive")
         if not 0.0 <= self.calibration_fraction < 1.0:
@@ -133,10 +136,13 @@ class PipelineConfig:
     @classmethod
     def load(cls, path: Optional[Path] = None) -> "PipelineConfig":
         """Defaults, overridden by the sections/keys present in a TOML file."""
-        cfg = cls()
         if path is None:
-            return cfg
-        data = tomllib.loads(Path(path).read_text())
+            return cls()
+        return cls().with_overrides(tomllib.loads(Path(path).read_text()), source=str(path))
+
+    def with_overrides(self, data: Dict[str, Any], source: str = "overrides") -> "PipelineConfig":
+        """A copy with the given {section: {key: value}} / {key: value} entries replaced."""
+        cfg, data, cls = self, dict(data), type(self)
         updates = {}
         for f in fields(cls):
             if f.name not in data:
@@ -149,7 +155,7 @@ class PipelineConfig:
             else:
                 updates[f.name] = value
         if data:
-            raise ValueError(f"Unknown config keys in {path}: {sorted(data)}")
+            raise ValueError(f"Unknown config keys in {source}: {sorted(data)}")
         return replace(cfg, **updates)
 
     def to_dict(self) -> Dict[str, Any]:

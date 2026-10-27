@@ -52,10 +52,9 @@ def compute_features(path: str, cfg: PipelineConfig, scales: Sequence[Scale]) ->
     return ImageFeatures(shape=img.shape, roi=(c0, c1), coords=coords, blocks=blocks)
 
 
-def _feature_key(cfg: PipelineConfig, scales: Sequence[Scale]) -> str:
+def _feature_key(cfg: PipelineConfig) -> str:
     """Hash of everything that changes the cached numbers (not modelling or scoring settings)."""
     relevant = {k: asdict(getattr(cfg, k)) for k in ("preprocess", "glcm", "lbp", "gabor")}
-    relevant["scales"] = [list(s) for s in scales]
     return hashlib.sha1(json.dumps(relevant, sort_keys=True).encode()).hexdigest()[:12]
 
 
@@ -64,39 +63,36 @@ def _file_key(path: str) -> str:
     return hashlib.sha1(f"{Path(path).resolve()}|{st.st_size}|{st.st_mtime_ns}".encode()).hexdigest()[:16]
 
 
-def _save(f: ImageFeatures, file: Path) -> None:
-    arrays = {"shape": np.array(f.shape), "roi": np.array(f.roi)}
-    for size in f.coords:
-        arrays[f"{size}_coords"] = f.coords[size]
-        for name, block in f.blocks[size].items():
-            arrays[f"{size}_{name}"] = block
+def _save(f: ImageFeatures, size: int, file: Path) -> None:
+    """One file per image and scale, so runs with different window sets share entries."""
+    arrays = {"shape": np.array(f.shape), "roi": np.array(f.roi), "coords": f.coords[size]}
+    arrays.update({f"b_{name}": block for name, block in f.blocks[size].items()})
     tmp = file.with_suffix(".tmp.npz")
     np.savez_compressed(tmp, **arrays)
     tmp.replace(file)  # atomic: a crashed run never leaves a half-written cache entry
 
 
-def _load(file: Path) -> ImageFeatures:
-    with np.load(file) as z:
-        sizes = sorted({int(k.split("_")[0]) for k in z.files if k.endswith("_coords")})
-        return ImageFeatures(
-            shape=tuple(int(v) for v in z["shape"]),
-            roi=tuple(int(v) for v in z["roi"]),
-            coords={s: z[f"{s}_coords"] for s in sizes},
-            blocks={s: {k.split("_", 1)[1]: z[k] for k in z.files
-                        if k.startswith(f"{s}_") and not k.endswith("_coords")} for s in sizes},
-        )
+def _load(files: Dict[int, Path]) -> ImageFeatures:
+    coords, blocks = {}, {}
+    for size, file in files.items():
+        with np.load(file) as z:
+            shape, roi = tuple(int(v) for v in z["shape"]), tuple(int(v) for v in z["roi"])
+            coords[size] = z["coords"]
+            blocks[size] = {k[2:]: z[k] for k in z.files if k.startswith("b_")}
+    return ImageFeatures(shape=shape, roi=roi, coords=coords, blocks=blocks)
 
 
 def _load_or_compute(args) -> ImageFeatures:
-    path, cfg, scales, cache_file = args
-    if cache_file is not None and cache_file.exists():
+    path, cfg, scales, files = args
+    if files is not None and all(f.exists() for f in files.values()):
         try:
-            return _load(cache_file)
+            return _load(files)
         except (OSError, ValueError, KeyError):
-            log.warning("Recomputing unreadable cache entry %s", cache_file)
+            log.warning("Recomputing unreadable cache entry for %s", path)
     f = compute_features(path, cfg, scales)
-    if cache_file is not None:
-        _save(f, cache_file)
+    if files is not None:
+        for size, file in files.items():
+            _save(f, size, file)
     return f
 
 
@@ -110,10 +106,14 @@ def load_features(
     """Features for every path, from the cache when possible; `workers` > 1 uses processes."""
     folder = None
     if cache_dir is not None:
-        folder = Path(cache_dir) / f"features-{_feature_key(cfg, scales)}"
+        folder = Path(cache_dir) / f"features-{_feature_key(cfg)}"
         folder.mkdir(parents=True, exist_ok=True)
-    jobs = [(p, cfg, list(scales), folder / f"{_file_key(p)}.npz" if folder else None) for p in paths]
-    hits = sum(1 for *_, c in jobs if c is not None and c.exists())
+
+    def files(p):
+        return {size: folder / f"{_file_key(p)}_{size}s{stride}.npz" for size, stride in scales} if folder else None
+
+    jobs = [(p, cfg, list(scales), files(p)) for p in paths]
+    hits = sum(1 for *_, fs in jobs if fs is not None and all(f.exists() for f in fs.values()))
     log.info("Features for %d images (%d cached, %d to compute, %d worker%s)",
              len(jobs), hits, len(jobs) - hits, workers, "s" if workers > 1 else "")
     if workers > 1 and len(jobs) - hits > 1:

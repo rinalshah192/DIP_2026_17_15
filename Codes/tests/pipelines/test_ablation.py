@@ -47,7 +47,7 @@ def test_global_reference_shares_one_model(tmp_path):
                                       {256: {"glcm": rng.normal(size=(3, 4)), "lbp": rng.normal(size=(3, 2))}})
              for f in "ab" for i in range(4)}
     split = Split(fit={"a": ["a0", "a1", "a2"], "b": ["b0", "b1", "b2"]}, calib={"a": ["a3"], "b": ["b3"]})
-    cfg = PipelineConfig().with_overrides({"model": {"reference": "global", "scoring": "mahalanobis"}})
+    cfg = PipelineConfig().with_overrides({"model": {"reference": "global"}, "features": {"use": ["glcm", "lbp"]}})
     models = fit_models(feats, split, cfg)
     assert models["a"] is models["b"] and len(models["a"].mean_vector) == 6
 
@@ -57,15 +57,15 @@ def test_ablate_cli_end_to_end_on_synthetic_data(tmp_path):
 [[variant]]
 name = "default"
 [[variant]]
-name = "mahalanobis + refine"
-overrides = { model = { scoring = "mahalanobis" }, refine = { enabled = true } }
+name = "hybrid, no refine"
+overrides = { model = { scoring = "hybrid" }, refine = { enabled = false } }
 ''')
     out = tmp_path / "out"
     assert main(["ablate", "--synthetic", "--grid", str(g), "--out", str(out), "--max-test", "7"]) == 0
     summary = pd.read_csv(out / "summary.csv")
-    assert list(summary["variant"]) == ["default", "mahalanobis + refine"]
-    assert (summary["n_images"] == 7).all() and summary["refine"].tolist() == [False, True]
-    assert (out / "mahalanobis-refine.csv").exists() and (out / "run_config.json").exists()
+    assert list(summary["variant"]) == ["default", "hybrid, no refine"]
+    assert (summary["n_images"] == 7).all() and summary["refine"].tolist() == [True, False]
+    assert (out / "hybrid-no-refine.csv").exists() and (out / "run_config.json").exists()
 
 
 def test_ablate_cli_rejects_bad_grid(tmp_path):

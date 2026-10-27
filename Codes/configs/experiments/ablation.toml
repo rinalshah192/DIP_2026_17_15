@@ -1,4 +1,5 @@
-# One-factor-at-a-time ablation around the default config.
+# One-factor-at-a-time ablation around the default config
+# (Mahalanobis on GLCM+LBP+Gabor, per-fabric reference, k = 2.5, 64x64 refinement).
 # Run: python -m fabric_defect ablate --grid Codes/configs/experiments/ablation.toml --workers 8
 # Every variant uses the same seed, so the same image-level fit / calibration split.
 
@@ -21,22 +22,23 @@ name = "features: gabor"
 overrides = { features = { use = ["gabor"] } }
 
 [[variant]]
-name = "features: glcm+lbp+gabor"
-overrides = { features = { use = ["glcm", "lbp", "gabor"] } }
+name = "features: glcm+lbp"
+overrides = { features = { use = ["glcm", "lbp"] } }
 
-# --- Scoring (incl. learned one-class baselines) ------------------------------
+# --- Scoring ------------------------------------------------------------------
 [[variant]]
-name = "scoring: hybrid"
+name = "scoring: strip mahalanobis"
+overrides = { model = { scoring = "strip_mahalanobis" } }
+
+[[variant]]
+name = "scoring: hybrid (week 5)"
 overrides = { model = { scoring = "hybrid" } }
 
 [[variant]]
 name = "scoring: relative"
 overrides = { model = { scoring = "relative" } }
 
-[[variant]]
-name = "scoring: mahalanobis"
-overrides = { model = { scoring = "mahalanobis" } }
-
+# --- Learned one-class baselines (same features, split and threshold rule) ----
 [[variant]]
 name = "baseline: one-class svm"
 overrides = { model = { scoring = "ocsvm" } }
@@ -47,7 +49,7 @@ overrides = { model = { scoring = "iforest" } }
 
 # --- Adaptive (per-fabric) vs fixed (global) reference and threshold ----------
 [[variant]]
-name = "reference: global"
+name = "reference: global (fixed)"
 overrides = { model = { reference = "global" } }
 
 # --- Threshold multiplier -----------------------------------------------------
@@ -65,5 +67,5 @@ name = "refine: off"
 overrides = { refine = { enabled = false } }
 
 [[variant]]
-name = "refine: on"
-overrides = { refine = { enabled = true } }
+name = "week 5 setting"
+overrides = { features = { use = ["glcm", "lbp"] }, model = { scoring = "hybrid" }, refine = { enabled = false } }

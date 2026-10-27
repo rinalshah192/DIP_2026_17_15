@@ -2,8 +2,8 @@
 Pipeline configuration.
 ECE501 - Digital Image Processing (Group 15)
 
-Every tunable parameter lives in one frozen dataclass tree. Defaults reproduce the
-mid-semester settings; a TOML file (see Codes/configs/default.toml) can override
+Every tunable parameter lives in one frozen dataclass tree. Defaults are the best
+setting of the Week-6 AFID ablation (Codes/configs/experiments/ablation.toml); a TOML file (see Codes/configs/default.toml) can override
 any subset of them. The resolved config is saved next to every run's results.
 """
 
@@ -69,7 +69,7 @@ FEATURE_BLOCKS = ("glcm", "lbp", "gabor")
 
 @dataclass(frozen=True)
 class FeatureConfig:
-    use: Tuple[str, ...] = ("glcm", "lbp")  # blocks concatenated into the descriptor, in this order
+    use: Tuple[str, ...] = ("glcm", "lbp", "gabor")  # blocks concatenated into the descriptor, in this order
 
     def __post_init__(self):
         if not self.use or any(b not in FEATURE_BLOCKS for b in self.use):
@@ -78,7 +78,7 @@ class FeatureConfig:
 
 @dataclass(frozen=True)
 class ModelConfig:
-    scoring: str = "hybrid"  # "hybrid", "relative", "mahalanobis", "strip_mahalanobis", or baselines "ocsvm", "iforest"
+    scoring: str = "mahalanobis"  # also "hybrid", "relative", "strip_mahalanobis", baselines "ocsvm", "iforest"
     regularization: float = 1e-4  # lambda in Sigma + lambda * tr(Sigma)/D * I
     k: float = 2.5  # tau = mu + k * sigma (mahalanobis) or robust-z cut-off (hybrid/relative)
     calibration_fraction: float = 0.25  # share of defect-free images held out to calibrate tau
@@ -99,7 +99,7 @@ class ModelConfig:
 
 @dataclass(frozen=True)
 class RefineConfig:
-    enabled: bool = False
+    enabled: bool = True
     size: int = 64  # fine window side, px
     stride: int = 32
     k: float = 2.5  # tau_fine = mu + k * sigma of held-out fine-window Mahalanobis distances

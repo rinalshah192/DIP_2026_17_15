@@ -54,4 +54,4 @@ bandwidth = 1.0                  # octaves
 gamma = 0.5
 
 [features]
-use = ["glcm", "lbp", "gabor"]   # any of glcm, lbp, gabor
+use = ["glcm", "lbp"]            # any of glcm, lbp, gabor (gabor did not help under Mahalanobis)

@@ -2,8 +2,8 @@
 Pipeline configuration.
 ECE501 - Digital Image Processing (Group 15)
 
-Every tunable parameter lives in one frozen dataclass tree. Defaults are the best
-setting of the Week-6 AFID ablation (Codes/configs/experiments/ablation.toml); a TOML file (see Codes/configs/default.toml) can override
+Every tunable parameter lives in one frozen dataclass tree. Defaults follow the
+Week-6 AFID ablation (Codes/configs/experiments/ablation.toml); a TOML file (see Codes/configs/default.toml) can override
 any subset of them. The resolved config is saved next to every run's results.
 """
 
@@ -69,7 +69,7 @@ FEATURE_BLOCKS = ("glcm", "lbp", "gabor")
 
 @dataclass(frozen=True)
 class FeatureConfig:
-    use: Tuple[str, ...] = ("glcm", "lbp", "gabor")  # blocks concatenated into the descriptor, in this order
+    use: Tuple[str, ...] = ("glcm", "lbp")  # blocks concatenated into the descriptor; gabor is opt-in
 
     def __post_init__(self):
         if not self.use or any(b not in FEATURE_BLOCKS for b in self.use):

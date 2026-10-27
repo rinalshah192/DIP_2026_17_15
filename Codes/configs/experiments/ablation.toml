@@ -1,5 +1,5 @@
 # One-factor-at-a-time ablation around the default config
-# (Mahalanobis on GLCM+LBP+Gabor, per-fabric reference, k = 2.5, 64x64 refinement).
+# (Mahalanobis on GLCM+LBP, per-fabric reference, k = 2.5, 64x64 refinement).
 # Run: python -m fabric_defect ablate --grid Codes/configs/experiments/ablation.toml --workers 8
 # Every variant uses the same seed, so the same image-level fit / calibration split.
 
@@ -22,8 +22,8 @@ name = "features: gabor"
 overrides = { features = { use = ["gabor"] } }
 
 [[variant]]
-name = "features: glcm+lbp"
-overrides = { features = { use = ["glcm", "lbp"] } }
+name = "features: glcm+lbp+gabor"
+overrides = { features = { use = ["glcm", "lbp", "gabor"] } }
 
 # --- Scoring ------------------------------------------------------------------
 [[variant]]

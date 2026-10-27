@@ -12,9 +12,8 @@ def _patches(n=3, seed=0):
 def test_descriptor_dimensions_match_names():
     desc = TextureDescriptor()
     X = desc.extract_batch(_patches())
-    # GLCM 5 props x 3 distances x (mean, std) + LBP (10 + 18) bins + Gabor 12 filters x (mean, std)
-    assert X.shape == (3, 30 + 28 + 24)
-    assert len(desc.get_feature_names()) == 82
+    assert X.shape == (3, 58)  # 5 props x 3 distances x (mean, std) + (10 + 18) LBP bins
+    assert len(desc.get_feature_names()) == 58
     assert np.isfinite(X).all()
 
 
@@ -34,7 +33,7 @@ def test_glcm_names_follow_feature_order():
 
 def test_flat_patch_does_not_crash():
     X = TextureDescriptor().extract_batch(np.full((1, 64, 64), 128, np.uint8))
-    assert X.shape == (1, 82) and np.isfinite(X).all()
+    assert X.shape == (1, 58) and np.isfinite(X).all()
 
 
 def test_features_are_deterministic():

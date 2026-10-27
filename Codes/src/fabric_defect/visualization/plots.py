@@ -4,6 +4,7 @@ ECE501 - Digital Image Processing (Group 15)
 """
 
 from pathlib import Path
+from typing import Optional
 
 import matplotlib
 
@@ -23,17 +24,22 @@ def save_inspection_figure(
     pred_mask: np.ndarray,
     threshold: float,
     defect_type: str,
-    fabric_type: str
+    fabric_type: str,
+    coarse_mask: Optional[np.ndarray] = None
 ) -> Path:
-    """Five stacked panels along the strip: raw, pre-processed, deviation, ground truth, prediction."""
-    fig, axes = plt.subplots(5, 1, figsize=(16, 9), sharex=True)
+    """Stacked panels along the strip: raw, pre-processed, deviation, ground truth, (coarse,) prediction."""
     panels = [
         (raw_img, "gray", f"1. Raw strip ({raw_img.shape[0]} x {raw_img.shape[1]})"),
         (norm_img, "gray", "2. Pre-processed (illumination flattening + median + CLAHE)"),
         (heatmap, "inferno", "3. Texture deviation score"),
         (gt_mask, "Blues_r", f"4. Ground-truth mask ({defect_type})"),
-        (pred_mask, "Reds", f"5. Predicted mask (threshold {threshold:.2f} + morphology)"),
     ]
+    if coarse_mask is not None:
+        panels.append((coarse_mask, "Oranges", f"5. Coarse 256x256 mask (threshold {threshold:.2f})"))
+        panels.append((pred_mask, "Reds", "6. Refined 64x64 mask"))
+    else:
+        panels.append((pred_mask, "Reds", f"5. Predicted mask (threshold {threshold:.2f} + morphology)"))
+    fig, axes = plt.subplots(len(panels), 1, figsize=(16, 1.8 * len(panels)), sharex=True)
     for ax, (img, cmap, title) in zip(axes, panels):
         im = ax.imshow(img, cmap=cmap, aspect="auto")
         ax.set_title(title, fontsize=11, fontweight="bold", loc="left")

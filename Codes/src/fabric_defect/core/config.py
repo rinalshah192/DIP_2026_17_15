@@ -93,6 +93,18 @@ class ModelConfig:
 
 
 @dataclass(frozen=True)
+class RefineConfig:
+    enabled: bool = False
+    size: int = 64  # fine window side, px
+    stride: int = 32
+    k: float = 2.5  # tau_fine = mu + k * sigma of held-out fine-window Mahalanobis distances
+
+    def __post_init__(self):
+        if not 0 < self.stride <= self.size:
+            raise ValueError("refine.stride must be in (0, refine.size]")
+
+
+@dataclass(frozen=True)
 class SegmentConfig:
     kernel_size: int = 5
     min_area: int = 50
@@ -107,9 +119,14 @@ class PipelineConfig:
     gabor: GaborConfig = field(default_factory=GaborConfig)
     features: FeatureConfig = field(default_factory=FeatureConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
+    refine: RefineConfig = field(default_factory=RefineConfig)
     segment: SegmentConfig = field(default_factory=SegmentConfig)
     max_test_samples: int = 0  # 0 = every defective strip; n = n strips stratified by fabric
     seed: int = 0
+
+    def __post_init__(self):
+        if self.refine.size >= self.patch.size:
+            raise ValueError("refine.size must be smaller than patch.size")
 
     @classmethod
     def load(cls, path: Optional[Path] = None) -> "PipelineConfig":

@@ -11,7 +11,7 @@ import json
 import logging
 import platform
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from importlib.metadata import version
 from pathlib import Path
@@ -27,6 +27,7 @@ from fabric_defect.data.synthetic import generate_synthetic_aitex_benchmark
 from fabric_defect.evaluation.metrics import EvaluationSuite, evaluate_patch_classification, evaluate_pixel_localization
 from fabric_defect.features.cache import ImageFeatures, load_features
 from fabric_defect.features.preprocessing import Preprocessor, load_image
+from fabric_defect.modeling.refinement import coarse_region, refined_mask
 from fabric_defect.modeling.reference import TextureReferenceModel
 from fabric_defect.modeling.segmentation import DefectSegmenter, deviation_map
 from fabric_defect.visualization.plots import save_inspection_figure, save_summary_charts
@@ -98,7 +99,10 @@ def select_test(defect_images: pd.DataFrame, max_samples: int) -> pd.DataFrame:
 
 
 def feature_scales(cfg: PipelineConfig) -> List[Tuple[int, int]]:
-    return [(cfg.patch.size, cfg.patch.stride)]
+    scales = [(cfg.patch.size, cfg.patch.stride)]
+    if cfg.refine.enabled:
+        scales.append((cfg.refine.size, cfg.refine.stride))
+    return scales
 
 
 @dataclass
@@ -124,9 +128,14 @@ def stack(feats: Dict[str, ImageFeatures], paths: List[str], size: int, use) -> 
     return np.vstack(rows) if rows else None
 
 
-def fit_models(feats: Dict[str, ImageFeatures], split: Split, cfg: PipelineConfig) -> Dict[str, TextureReferenceModel]:
+def fit_models(
+    feats: Dict[str, ImageFeatures],
+    split: Split,
+    cfg: PipelineConfig,
+    size: Optional[int] = None
+) -> Dict[str, TextureReferenceModel]:
     """One reference model per fabric, fitted on the fit images and calibrated on the held-out ones."""
-    size, use = cfg.patch.size, cfg.features.use
+    size, use = size or cfg.patch.size, cfg.features.use
     models = {}
     for fabric, fit_paths in split.fit.items():
         X_fit = stack(feats, fit_paths, size, use)
@@ -143,6 +152,14 @@ def fit_models(feats: Dict[str, ImageFeatures], split: Split, cfg: PipelineConfi
     return models
 
 
+def fit_refiners(feats: Dict[str, ImageFeatures], split: Split, cfg: PipelineConfig) -> Dict[str, TextureReferenceModel]:
+    """Fine-scale (refine.size) Mahalanobis models on the same split; empty when refinement is off."""
+    if not cfg.refine.enabled:
+        return {}
+    fine = replace(cfg, model=replace(cfg.model, scoring="mahalanobis", k=cfg.refine.k))
+    return fit_models(feats, split, fine, size=cfg.refine.size)
+
+
 @dataclass
 class StripResult:
     """Everything evaluate() computed for one strip; kept only for figures."""
@@ -152,6 +169,7 @@ class StripResult:
     gt_mask: np.ndarray
     pred_mask: np.ndarray
     threshold: float
+    coarse_mask: Optional[np.ndarray] = None  # 256-level mask when refinement replaced it
 
 
 def evaluate(
@@ -159,7 +177,8 @@ def evaluate(
     feats: Dict[str, ImageFeatures],
     models: Dict[str, TextureReferenceModel],
     cfg: PipelineConfig,
-    keep: int = 0
+    keep: int = 0,
+    refiners: Optional[Dict[str, TextureReferenceModel]] = None
 ) -> Tuple[pd.DataFrame, List[StripResult]]:
     """Score, segment and measure every test strip; returns per-image metrics and `keep` strips for figures."""
     size, use = cfg.patch.size, cfg.features.use
@@ -189,6 +208,16 @@ def evaluate(
         scores, tau = model.score_strip(X)
         heat = deviation_map(scores, f.coords[size], f.shape, size)
         pred = segmenter.segment(heat, reference_threshold=tau)["cleaned_mask"]
+        coarse = None
+        if refiners:
+            fine_size, fine = cfg.refine.size, refiners.get(fabric)
+            coarse = pred
+            region = coarse_region(scores >= tau, f.coords[size], f.shape, size)
+            Xf = np.hstack([f.blocks[fine_size][b] for b in use])
+            fine_scores = fine.score_batch(Xf) if fine is not None else np.zeros(len(Xf))
+            tau_f = fine.adaptive_threshold if fine is not None else np.inf
+            pred = segmenter.apply_morphological_cleanup(
+                refined_mask(region, f.coords[fine_size], fine_scores, tau_f, fine_size))
 
         labels = [int(np.count_nonzero(gt[y:y + size, x:x + size]) > cfg.patch.defect_min_pixels)
                   for y, x in f.coords[size]]
@@ -199,7 +228,7 @@ def evaluate(
             descriptor_used=label,
         )
         if len(kept) < keep and gt.any():
-            kept.append(StripResult(row, heat, gt, pred, tau))
+            kept.append(StripResult(row, heat, gt, pred, tau, coarse))
     return suite.to_dataframe(), kept
 
 
@@ -226,7 +255,7 @@ def run_full_pipeline(
     feats = load_features(clean["image_path"].tolist() + test["image_path"].tolist(),
                           cfg, feature_scales(cfg), cache_dir, workers)
     models = fit_models(feats, split, cfg)
-    results, kept = evaluate(test, feats, models, cfg, keep=N_FIGURES)
+    results, kept = evaluate(test, feats, models, cfg, keep=N_FIGURES, refiners=fit_refiners(feats, split, cfg))
     return write_results(results, kept, cfg, out_dir, synthetic)
 
 
@@ -252,7 +281,7 @@ def write_results(results: pd.DataFrame, kept: List[StripResult], cfg: PipelineC
         save_inspection_figure(
             out_file=figures_dir / f"inspection_{stem}.png", sample_id=stem, raw_img=raw, norm_img=norm,
             heatmap=s.heatmap, gt_mask=s.gt_mask, pred_mask=s.pred_mask, threshold=s.threshold,
-            defect_type=s.row["defect_type"], fabric_type=s.row["fabric_type"],
+            defect_type=s.row["defect_type"], fabric_type=s.row["fabric_type"], coarse_mask=s.coarse_mask,
         )
 
     log.info(

@@ -34,6 +34,12 @@ regularization = 1e-4
 k = 2.5
 calibration_fraction = 0.25  # defect-free images held out per fabric to set tau
 
+[refine]                  # 64x64 re-scoring inside flagged 256x256 patches
+enabled = false
+size = 64
+stride = 32
+k = 2.5
+
 [segment]
 kernel_size = 5
 min_area = 50

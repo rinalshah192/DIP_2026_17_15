@@ -32,7 +32,7 @@ def build_parser() -> argparse.ArgumentParser:
                      help="generate and use synthetic strips (smoke test, not AFID results)")
     run.add_argument("--seed", type=int, default=None, help="override config seed")
     run.add_argument("--max-test", type=int, default=None, help="override number of defective strips evaluated (0 = all)")
-    run.add_argument("--scoring", choices=["hybrid", "relative", "mahalanobis"], default=None,
+    run.add_argument("--scoring", choices=["hybrid", "relative", "mahalanobis", "ocsvm", "iforest"], default=None,
                      help="override anomaly scoring method")
     run.add_argument("--workers", type=int, default=1, help="processes for feature extraction (default 1)")
     run.add_argument("--cache-dir", type=Path, default=PROCESSED_DATA_DIR,

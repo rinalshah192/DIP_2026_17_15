@@ -29,9 +29,11 @@ properties = ["contrast", "dissimilarity", "homogeneity", "energy", "correlation
 scales = [[8, 1], [16, 2]]  # (P, R) pairs, uniform riu2
 
 [model]
-scoring = "hybrid"        # hybrid | relative | mahalanobis
+scoring = "hybrid"        # hybrid | relative | mahalanobis | ocsvm | iforest
 regularization = 1e-4
 k = 2.5
+ocsvm_nu = 0.1
+iforest_trees = 200
 calibration_fraction = 0.25  # defect-free images held out per fabric to set tau
 
 [refine]                  # 64x64 re-scoring inside flagged 256x256 patches

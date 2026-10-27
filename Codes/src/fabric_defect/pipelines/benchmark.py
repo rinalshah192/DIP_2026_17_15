@@ -27,6 +27,7 @@ from fabric_defect.data.synthetic import generate_synthetic_aitex_benchmark
 from fabric_defect.evaluation.metrics import EvaluationSuite, evaluate_patch_classification, evaluate_pixel_localization
 from fabric_defect.features.cache import ImageFeatures, load_features
 from fabric_defect.features.preprocessing import Preprocessor, load_image
+from fabric_defect.modeling.baselines import OneClassBaseline
 from fabric_defect.modeling.refinement import coarse_region, refined_mask
 from fabric_defect.modeling.reference import TextureReferenceModel
 from fabric_defect.modeling.segmentation import DefectSegmenter, deviation_map
@@ -128,6 +129,13 @@ def stack(feats: Dict[str, ImageFeatures], paths: List[str], size: int, use) -> 
     return np.vstack(rows) if rows else None
 
 
+def make_model(fabric: str, cfg: PipelineConfig):
+    """Mahalanobis reference (mahalanobis / relative / hybrid scoring) or a one-class baseline."""
+    if cfg.model.scoring in ("ocsvm", "iforest"):
+        return OneClassBaseline(fabric, cfg.model, seed=cfg.seed)
+    return TextureReferenceModel(fabric_type=fabric, cfg=cfg.model)
+
+
 def fit_models(
     feats: Dict[str, ImageFeatures],
     split: Split,
@@ -143,7 +151,7 @@ def fit_models(
             log.warning("%s: no usable defect-free patches, fabric skipped", fabric)
             continue
         X_cal = stack(feats, split.calib[fabric], size, use)
-        model = TextureReferenceModel(fabric_type=fabric, cfg=cfg.model).fit(X_fit, X_cal)
+        model = make_model(fabric, cfg).fit(X_fit, X_cal)
         source = (f"{len(split.calib[fabric])} held-out images" if model.calibrated_out_of_sample
                   else "in-sample (too few images)")
         log.debug("%s: fit on %d images / %d patches; tau = %.3f from %s",

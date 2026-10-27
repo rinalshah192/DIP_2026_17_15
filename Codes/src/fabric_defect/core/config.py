@@ -78,13 +78,15 @@ class FeatureConfig:
 
 @dataclass(frozen=True)
 class ModelConfig:
-    scoring: str = "hybrid"  # "hybrid", "relative" or "mahalanobis"
+    scoring: str = "hybrid"  # "hybrid", "relative", "mahalanobis", or baselines "ocsvm", "iforest"
     regularization: float = 1e-4  # lambda in Sigma + lambda * tr(Sigma)/D * I
     k: float = 2.5  # tau = mu + k * sigma (mahalanobis) or robust-z cut-off (hybrid/relative)
     calibration_fraction: float = 0.25  # share of defect-free images held out to calibrate tau
+    ocsvm_nu: float = 0.1  # One-Class SVM: upper bound on the training outlier fraction
+    iforest_trees: int = 200
 
     def __post_init__(self):
-        if self.scoring not in ("hybrid", "relative", "mahalanobis"):
+        if self.scoring not in ("hybrid", "relative", "mahalanobis", "ocsvm", "iforest"):
             raise ValueError(f"unknown scoring method {self.scoring!r}")
         if self.k <= 0:
             raise ValueError("k must be positive")

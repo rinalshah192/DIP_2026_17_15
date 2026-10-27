@@ -1,0 +1,19 @@
+{
+  "n_images": 105,
+  "patch_accuracy": 0.5666506741043666,
+  "patch_precision": 0.18666240797552563,
+  "patch_recall": 0.6318855057985493,
+  "patch_f1": 0.18138662390962898,
+  "patch_specificity": 0.5529388778383221,
+  "pixel_iou": 0.013634880059952134,
+  "pixel_dice": 0.01973810626514967,
+  "pixel_precision": 0.01849500357458761,
+  "pixel_recall": 0.4838768968159316,
+  "pooled_patch_precision": 0.1371841155234657,
+  "pooled_patch_recall": 0.6643356643356644,
+  "pooled_patch_f1": 0.22740873728306404,
+  "pooled_pixel_iou": 0.011214645937809799,
+  "pooled_pixel_dice": 0.02218054491766035,
+  "pooled_pixel_precision": 0.01123210427650553,
+  "pooled_pixel_recall": 0.878273287010707
+}

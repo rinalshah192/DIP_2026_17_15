@@ -37,3 +37,12 @@ calibration_fraction = 0.25  # defect-free images held out per fabric to set tau
 [segment]
 kernel_size = 5
 min_area = 50
+
+[gabor]
+orientations_deg = [0.0, 45.0, 90.0, 135.0]
+wavelengths = [4.0, 8.0, 16.0]   # px
+bandwidth = 1.0                  # octaves
+gamma = 0.5
+
+[features]
+use = ["glcm", "lbp"]            # any of glcm, lbp, gabor

@@ -57,6 +57,26 @@ class LBPConfig:
 
 
 @dataclass(frozen=True)
+class GaborConfig:
+    orientations_deg: Tuple[float, ...] = (0.0, 45.0, 90.0, 135.0)
+    wavelengths: Tuple[float, ...] = (4.0, 8.0, 16.0)  # px; AFID yarn period is roughly 4-8 px
+    bandwidth: float = 1.0  # octaves; sets sigma from the wavelength
+    gamma: float = 0.5  # spatial aspect ratio of the Gaussian envelope
+
+
+FEATURE_BLOCKS = ("glcm", "lbp", "gabor")
+
+
+@dataclass(frozen=True)
+class FeatureConfig:
+    use: Tuple[str, ...] = ("glcm", "lbp")  # blocks concatenated into the descriptor, in this order
+
+    def __post_init__(self):
+        if not self.use or any(b not in FEATURE_BLOCKS for b in self.use):
+            raise ValueError(f"features.use must be a non-empty subset of {FEATURE_BLOCKS}")
+
+
+@dataclass(frozen=True)
 class ModelConfig:
     scoring: str = "hybrid"  # "hybrid", "relative" or "mahalanobis"
     regularization: float = 1e-4  # lambda in Sigma + lambda * tr(Sigma)/D * I
@@ -84,6 +104,8 @@ class PipelineConfig:
     patch: PatchConfig = field(default_factory=PatchConfig)
     glcm: GLCMConfig = field(default_factory=GLCMConfig)
     lbp: LBPConfig = field(default_factory=LBPConfig)
+    gabor: GaborConfig = field(default_factory=GaborConfig)
+    features: FeatureConfig = field(default_factory=FeatureConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
     segment: SegmentConfig = field(default_factory=SegmentConfig)
     max_test_samples: int = 14

@@ -109,7 +109,7 @@ def run_full_pipeline(
 
     # 2. Engines
     preprocessor = Preprocessor(cfg.preprocess)
-    descriptor = TextureDescriptor(cfg.glcm, cfg.lbp)
+    descriptor = TextureDescriptor(cfg.glcm, cfg.lbp, cfg.gabor, cfg.features)
     segmenter = DefectSegmenter(cfg.segment, method="adaptive", adaptive_k=cfg.model.k)
     eval_suite = EvaluationSuite()
     psize, stride = cfg.patch.size, cfg.patch.stride

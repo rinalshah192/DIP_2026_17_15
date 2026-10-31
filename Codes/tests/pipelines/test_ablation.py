@@ -64,7 +64,7 @@ overrides = { model = { scoring = "hybrid" }, refine = { enabled = false } }
     assert main(["ablate", "--synthetic", "--grid", str(g), "--out", str(out), "--max-test", "7"]) == 0
     summary = pd.read_csv(out / "summary.csv")
     assert list(summary["variant"]) == ["default", "hybrid, no refine"]
-    assert (summary["n_images"] == 7).all() and summary["refine"].tolist() == [True, False]
+    assert (summary["n_images"] == 7).all() and summary["refine"].astype(str).tolist() == ["64", "off"]
     assert (out / "hybrid-no-refine.csv").exists() and (out / "run_config.json").exists()
 
 

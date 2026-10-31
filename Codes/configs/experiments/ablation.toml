@@ -1,5 +1,6 @@
 # One-factor-at-a-time ablation around the default config
-# (Mahalanobis on GLCM+LBP, per-fabric reference, k = 2.5, 64x64 refinement).
+# (Mahalanobis on GLCM+LBP, per-fabric reference, k = 2.5, 64x64 refinement,
+# 12 / 4 / 4 fit / calibration / test defect-free strips per fabric).
 # Run: python -m fabric_defect ablate --grid Codes/configs/experiments/ablation.toml --workers 8
 # Every variant uses the same seed, so the same image-level fit / calibration split.
 
@@ -52,6 +53,10 @@ overrides = { model = { scoring = "iforest" } }
 name = "reference: global (fixed)"
 overrides = { model = { reference = "global" } }
 
+[[variant]]
+name = "reference: in-domain (cross-validated)"
+overrides = { model = { reference = "in_domain" } }
+
 # --- Threshold multiplier -----------------------------------------------------
 [[variant]]
 name = "k = 2.0"
@@ -65,6 +70,23 @@ overrides = { model = { k = 3.0 } }
 [[variant]]
 name = "refine: off"
 overrides = { refine = { enabled = false } }
+
+[[variant]]
+name = "refine: 64 then 32"
+overrides = { refine = { sizes = [64, 32] } }
+
+[[variant]]
+name = "refine: 32 only"
+overrides = { refine = { sizes = [32] } }
+
+# --- Evaluation protocol (changes ground truth / decision, not the detector) ---
+[[variant]]
+name = "patch label: any defect pixel"
+overrides = { patch = { defect_min_pixels = 0 } }
+
+[[variant]]
+name = "image alpha = 0.10"
+overrides = { model = { image_alpha = 0.10 } }
 
 [[variant]]
 name = "week 5 setting"

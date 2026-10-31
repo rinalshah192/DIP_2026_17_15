@@ -4,13 +4,14 @@ ECE501 Digital Image Processing, Group 15 (Rinal Shah, Varun Hotani, Aadi Mehta,
 
 This project detects and localizes defects in woven fabric using **classical texture descriptors only**, with no deep learning. It runs on the [AITEX Fabric Image Database (AFID)](https://www.aitex.es/afid/).
 
-For each fabric, a model of normal texture is built from defect-free images. Every 256×256 window of a test strip is scored against its fabric's model. Flagged windows are then re-examined at 64×64 to produce a pixel mask.
+For each fabric, a model of normal texture is built from defect-free images. Every 256×256 window of a test strip is scored against its fabric's model. Flagged windows are then re-examined at 64×64 to produce a pixel mask. Each strip also gets an image-level decision with a calibrated confidence.
 
 ```
 strip ─► fabric ROI ─► illumination flattening ─► median ─► CLAHE
       ─► 256×256 windows (stride 128) ─► GLCM (30-D) + multi-scale LBP (28-D)  [+ Gabor (24-D), optional]
       ─► per-fabric Mahalanobis reference ─► τ from held-out defect-free images ─► flagged windows
       ─► 64×64 re-scoring inside flagged windows ─► morphology ─► predicted mask ─► patch + pixel metrics
+      ─► image score max(window score)/τ ─► conformal confidence vs held-out defect-free strips ─► image decision
 ```
 
 ---
@@ -31,12 +32,13 @@ Codes/                              # all source code (course-required folder)
     core/config.py, core/paths.py   # typed config (dataclasses + TOML) and repository paths
     data/afid.py, data/synthetic.py # AFID catalog, official codes, masks; synthetic smoke-test strips
     features/                       # preprocessing, glcm, lbp, gabor, fused descriptor, feature cache
-    modeling/                       # Mahalanobis reference, one-class baselines, 64×64 refinement, segmentation
-    evaluation/metrics.py           # patch / pixel metrics, per-image and pooled summaries
+    modeling/                       # Mahalanobis reference, one-class baselines, refinement cascade,
+                                    # conformal image confidence, segmentation
+    evaluation/metrics.py           # patch / pixel / image-level metrics, per-image and pooled summaries
     pipelines/benchmark.py          # end-to-end run
     pipelines/ablation.py           # runs an ablation grid on shared features
     visualization/plots.py          # inspection figures and charts
-  tests/                            # mirrors the package; 72 tests
+  tests/                            # mirrors the package; 86 tests
 Results/final/                      # full AFID benchmark with the default config
 Results/ablation/                   # one CSV per ablation variant + summary.csv
 Results/legacy/                     # mid-semester CSVs and early synthetic figures (kept for reference)
@@ -131,23 +133,30 @@ python -m fabric_defect run --synthetic --out /tmp/smoke
 ### What a run does
 
 1. **Catalog.** Scan `data/raw`, parse the fabric and defect code from each filename, and merge mask parts.
-2. **Split.** Split each fabric's defect-free images **by image** into a fit set (75 %) and a calibration set (25 %), using a seeded split.
-3. **Fit.** Build each fabric's reference (mean and regularised covariance) on the fit images, at 256×256 and at 64×64.
-4. **Calibrate.** τ = mean + k·std of the reference's scores on the **held-out** calibration images (k = 2.5).
+2. **Split.** Split each fabric's 20 defect-free images **by image**, using a seeded split:
+   - 12 to fit
+   - 4 to calibrate
+   - 4 held out as image-level negatives
+3. **Fit.** Build each fabric's reference (mean and regularised covariance) on the fit images, at 256×256 and at every refinement size.
+4. **Calibrate.**
+   - τ = mean + k·std of the reference's scores on the **held-out** calibration images (k = 2.5).
+   - Their image scores also calibrate the conformal confidence.
 5. **Detect.** Flag 256×256 windows whose score is ≥ τ.
-6. **Refine.** Re-score the 64×64 windows that lie inside flagged regions, against the 64×64 model.
+6. **Refine.** Re-score the 64×64 windows that lie inside flagged regions, against the 64×64 model. With `refine.sizes = [64, 32]`, the flagged 64×64 windows then bound a 32×32 pass.
 7. **Clean up.** Apply morphology to get the predicted mask.
-8. **Evaluate and write.** Compute the metrics and write CSVs, `summary.json`, `run_config.json` and figures.
+8. **Image decision.** Compute the image score, conformal confidence and defective / defect-free call for every defective strip and every held-out defect-free strip.
+9. **Evaluate and write.** Compute the metrics and write CSVs, `summary.json`, `run_config.json` and figures.
 
 ### Outputs
 
 | File | Contents |
 |---|---|
 | `metrics_summary.csv` | One row per strip: patch TP/FP/TN/FN, accuracy, precision, recall, F1, specificity; pixel IoU, Dice, precision, recall, pixel counts |
-| `fabric_summary.csv`, `defect_summary.csv` | Per-fabric and per-defect means plus `n_images` |
-| `summary.json` | Overall per-image means **and pooled metrics** (TP/FP/FN summed over all strips first) |
+| `fabric_summary.csv`, `defect_summary.csv` | Per-fabric and per-defect means plus `n_images` (defective strips) |
+| `summary.json` | Overall per-image means, **pooled metrics** (TP/FP/FN summed over all strips first) and `image_*` detection metrics |
+| `image_level_by_fabric.csv` | Image-level accuracy, precision, recall, specificity, F1 and AUROC per fabric |
 | `run_config.json` | Time, git SHA and dirty flag, data folder, package versions, full resolved config (and the grid for ablations) |
-| `figures/` | Inspection collages (raw, pre-processed, deviation, ground truth, coarse mask, refined mask) and charts |
+| `figures/` | Inspection collages (raw, pre-processed, deviation, ground truth, coarse mask, refined mask), charts, and image-score distributions with ROC (`image_scores.png`) |
 
 **Metric conventions:**
 - A ratio with a zero denominator is **NaN, not 0**. Means skip NaN, and `n_images` says how many strips were averaged.
@@ -166,8 +175,8 @@ All parameters live in `Codes/configs/default.toml`, which mirrors `src/fabric_d
 | `patch` | `size` 256, `stride` 128, `defect_min_pixels` 25 |
 | `glcm` / `lbp` / `gabor` | GLCM: 64 levels, distances 1–3, 4 angles. LBP: (8,1) + (16,2) riu2. Gabor: λ 4/8/16 px, 4 orientations, 1-octave bandwidth |
 | `features` | `use` ["glcm", "lbp"] (any of glcm, lbp, gabor) |
-| `model` | `scoring` "mahalanobis", `reference` "per_fabric", `k` 2.5, `calibration_fraction` 0.25, `regularization` 1e-4, `ocsvm_nu` 0.1, `iforest_trees` 200 |
-| `refine` | `enabled` true, `size` 64, `stride` 32, `k` 2.5 |
+| `model` | `scoring` "mahalanobis", `reference` "per_fabric", `k` 2.5, `calibration_fraction` 0.2, `test_fraction` 0.2, `folds` 5, `image_alpha` 0.05, `regularization` 1e-4, `ocsvm_nu` 0.1, `iforest_trees` 200 |
+| `refine` | `enabled` true, `sizes` [64] (e.g. [64, 32] for a cascade; stride = size/2), `k` 2.5 |
 | `segment` | `kernel_size` 5, `min_area` 50 |
 | top level | `max_test_samples` 0 (= all), `seed` 0 |
 
@@ -180,24 +189,43 @@ All parameters live in `Codes/configs/default.toml`, which mirrors `src/fabric_d
 
 `model.reference = "global"` fits one model and one τ on all fabrics pooled: the *fixed* counterpart to the *adaptive* per-fabric default.
 
+`model.reference = "in_domain"` adds the defect-free windows (no ground-truth pixel) of *other* defective strips of the same fabric to its fit and calibration data. It runs as `folds`-fold cross-validation by strip, so a strip is never scored by a model that saw any of its windows. Fabrics with a single defective strip fall back to the defect-free reference.
+
+**Image level.**
+- A strip's score is S = max window score / τ.
+- Its confidence is 1 − p, where p is a conformal p-value against the image scores of the held-out defect-free calibration strips: p = (1 + #{S_cal ≥ S}) / (n + 1).
+- The strip is called defective when p ≤ `image_alpha`. This bounds the false-alarm rate on defect-free strips from the same capture.
+
 **Ablation grids** are TOML files with a `base` config and `[[variant]]` tables. Each variant has a `name` and `overrides` in the same shape as the config. See `Codes/configs/experiments/ablation.toml`.
 
 ---
 
-## 5. Results (AFID, 105 defective strips with masks)
+## 5. Results (AFID: 105 defective + 28 held-out defect-free strips)
 
-Full tables are in `Results/final/` and `Results/ablation/summary.csv`; discussion is in `reports/week-6/Week_6_Report.pdf`.
+Full tables are in `Results/final/` and `Results/ablation/summary.csv`; discussion is in `reports/week-7/Week_7_Report.pdf`.
 
-| Setting | Patch F1 | Pooled patch F1 | Pixel IoU | Pixel recall |
+**Localization** (105 defective strips; window AUROC is threshold-free, 0.5 = chance):
+
+| Setting | Patch F1 | Pooled patch F1 | Window AUROC | Pixel IoU | Pixel recall |
+|---|---|---|---|---|---|
+| Week-5 setting (hybrid, GLCM+LBP, no refinement) | 14.01 % | 14.85 % | 0.574 | 0.30 % | 32.88 % |
+| **Default** (Mahalanobis, GLCM+LBP, 64×64 refinement) | **18.38 %** | **23.02 %** | 0.536 | 1.36 % | 48.41 % |
+| Refinement cascade 64 → 32 | 18.38 % | 23.02 % | 0.536 | 1.52 % | 43.75 % |
+| Fixed global reference instead of per-fabric | 5.77 % | 12.02 % | 0.461 | 0.08 % | 22.82 % |
+| In-domain reference (cross-validated) | 7.86 % | 12.54 % | **0.609** | 0.35 % | 10.60 % |
+| One-Class SVM baseline | 16.71 % | 23.43 % | 0.572 | 1.32 % | 43.70 % |
+
+**Image level** (defective vs defect-free strip, conformal confidence, α = 0.05):
+
+| Setting | Accuracy | Detection rate | False-alarm rate | AUROC |
 |---|---|---|---|---|
-| Week-5 setting (hybrid, GLCM+LBP, no refinement) | 13.97 % | 14.78 % | 0.30 % | 32.73 % |
-| **Default** (Mahalanobis, GLCM+LBP, 64×64 refinement) | **18.14 %** | **22.74 %** | **1.36 %** | **48.39 %** |
-| Fixed global reference instead of per-fabric | 5.78 % | 12.03 % | 0.07 % | 22.82 % |
-| One-Class SVM baseline | 16.47 % | 23.41 % | 1.30 % | 43.65 % |
-| Isolation Forest baseline | 13.96 % | 17.96 % | 0.85 % | 39.39 % |
-| Default without refinement | 18.14 % | 22.74 % | 0.70 % | 53.89 % |
+| **Default** | **68.42 %** | 60.00 % | **0 / 28** | 0.790 |
+| Gabor features only | 72.93 % | 65.71 % | 0 / 28 | **0.878** |
+| Week-5 setting | 49.62 % | 36.19 % | 0 / 28 | 0.675 |
 
-Key finding: for 5 of the 7 fabrics, AFID's defect-free and defective strips differ systematically. Normal windows of defective strips score far above the held-out defect-free calibration images. This false-positive floor, not the descriptor, is what limits precision. See the Week 6 report.
+Key findings:
+- For 5 of the 7 fabrics, AFID's defect-free and defective strips differ systematically (a capture shift). This inflates image-level scores on those fabrics. Fabrics 03, 04 and 06 are the fair test.
+- Within a strip, the descriptors rank defect windows only slightly above background (window AUROC 0.54). That, not the threshold or the scorer, limits precision.
 
 Earlier numbers are in `Results/legacy/` and should not be reused:
 - the mid-semester 13-image CSVs, whose defect labels came from the old code map
@@ -208,7 +236,7 @@ Earlier numbers are in `Results/legacy/` and should not be reused:
 ## 6. Tests and CI
 
 ```bash
-pytest Codes/tests -q        # 72 tests, about 2 min (includes synthetic end-to-end runs)
+pytest Codes/tests -q        # 86 tests, about 2.5 min (includes synthetic end-to-end runs)
 ```
 
 The tests mirror the package layout. They cover:

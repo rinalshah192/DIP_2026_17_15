@@ -9,10 +9,16 @@ NaN-skipping means and report how many images each mean is taken over.
 Computes standardized quantitative metrics:
 1. Patch-level Classification: Accuracy, Precision, Recall, F1-Score, Specificity
 2. Pixel-level Localization: Intersection over Union (IoU), Dice (F1), Pixel Precision, Recall
+3. Image-level Detection: accuracy, precision, recall, specificity, F1 and AUROC over defective
+   and defect-free test strips
+
+Patch and pixel metrics are summarised over defective strips only; image-level
+metrics need both kinds.
 """
 
 import numpy as np
 import pandas as pd
+from sklearn.metrics import roc_auc_score
 from typing import Dict, List, Optional, Tuple
 
 
@@ -95,6 +101,7 @@ def evaluate_pixel_localization(
 SUMMARY_METRICS = (
     "patch_accuracy", "patch_precision", "patch_recall", "patch_f1", "patch_specificity",
     "pixel_iou", "pixel_dice", "pixel_precision", "pixel_recall",
+    "patch_auroc",
 )
 
 
@@ -105,8 +112,11 @@ def summarize(df: pd.DataFrame) -> Dict[str, float]:
     and skips images where a ratio is undefined; pooled metrics sum TP/FP/FN
     over all images first, so they weight every pixel (or patch) equally.
     """
+    full = df
+    if "is_defective" in df.columns:
+        df = df[df["is_defective"].astype(bool)]
     out = {"n_images": int(len(df))}
-    out.update({m: float(df[m].mean()) if len(df) else float("nan") for m in SUMMARY_METRICS})
+    out.update({m: float(df[m].mean()) if len(df) and m in df else float("nan") for m in SUMMARY_METRICS})
     if len(df):
         tp, fp, fn = (float(df[f"patch_{k}"].sum()) for k in ("tp", "fp", "fn"))
         out.update(pooled_patch_precision=_ratio(tp, tp + fp), pooled_patch_recall=_ratio(tp, tp + fn),
@@ -115,7 +125,29 @@ def summarize(df: pd.DataFrame) -> Dict[str, float]:
         pred, gt = float(df["pred_defect_pixels"].sum()), float(df["gt_defect_pixels"].sum())
         out.update(pooled_pixel_iou=_ratio(ptp, pred + gt - ptp), pooled_pixel_dice=_ratio(2 * ptp, pred + gt),
                    pooled_pixel_precision=_ratio(ptp, pred), pooled_pixel_recall=_ratio(ptp, gt))
+    if "image_pred" in full.columns:
+        out.update({f"image_{k}": v for k, v in image_level_metrics(full).items()})
     return out
+
+
+def image_level_metrics(df: pd.DataFrame) -> Dict[str, float]:
+    """Strip-level detection over defective (positive) and defect-free (negative) test strips.
+
+    recall = detection rate; specificity = 1 - false-alarm rate; AUROC ranks strips by
+    image score, so it does not depend on alpha.
+    """
+    y = df["is_defective"].astype(bool).to_numpy()
+    pred = df["image_pred"].astype(bool).to_numpy()
+    tp, fp = int((y & pred).sum()), int((~y & pred).sum())
+    tn, fn = int((~y & ~pred).sum()), int((y & ~pred).sum())
+    both = 0 < y.sum() < len(y)
+    return {
+        "n_pos": int(y.sum()), "n_neg": int((~y).sum()),
+        "accuracy": _ratio(tp + tn, len(y)), "precision": _ratio(tp, tp + fp),
+        "recall": _ratio(tp, tp + fn), "specificity": _ratio(tn, tn + fp),
+        "f1": _ratio(2 * tp, 2 * tp + fp + fn),
+        "auroc": float(roc_auc_score(y, df["image_score"])) if both else float("nan"),
+    }
 
 
 def _ratio(num: float, den: float) -> float:
@@ -135,7 +167,8 @@ class EvaluationSuite:
         defect_type: str,
         patch_metrics: Dict[str, float],
         pixel_metrics: Dict[str, float],
-        descriptor_used: str = "GLCM+LBP"
+        descriptor_used: str = "GLCM+LBP",
+        **extra
     ):
         combined = {
             "sample_id": sample_id,
@@ -143,7 +176,8 @@ class EvaluationSuite:
             "defect_type": defect_type,
             "descriptor": descriptor_used,
             **patch_metrics,
-            **pixel_metrics
+            **pixel_metrics,
+            **extra
         }
         self.records.append(combined)
 
@@ -152,6 +186,8 @@ class EvaluationSuite:
 
     def summary_table(self, by: str = "fabric_type") -> pd.DataFrame:
         df = self.to_dataframe()
+        if "is_defective" in df.columns:
+            df = df[df["is_defective"].astype(bool)]
         if df.empty:
             return df
 

@@ -81,32 +81,48 @@ class ModelConfig:
     scoring: str = "mahalanobis"  # also "hybrid", "relative", "strip_mahalanobis", baselines "ocsvm", "iforest"
     regularization: float = 1e-4  # lambda in Sigma + lambda * tr(Sigma)/D * I
     k: float = 2.5  # tau = mu + k * sigma (mahalanobis) or robust-z cut-off (hybrid/relative)
-    calibration_fraction: float = 0.25  # share of defect-free images held out to calibrate tau
-    reference: str = "per_fabric"  # "per_fabric" (adaptive: one model and tau per fabric) or "global" (fixed)
+    calibration_fraction: float = 0.2  # share of defect-free images held out to calibrate tau
+    test_fraction: float = 0.2  # share of defect-free images held out as image-level negatives
+    # "per_fabric" (adaptive: one model and tau per fabric), "global" (fixed: one for all fabrics), or
+    # "in_domain" (per fabric, plus defect-free windows of other defective strips; cross-validated)
+    reference: str = "per_fabric"
+    folds: int = 5  # in_domain: cross-validation folds over each fabric's test strips
+    image_alpha: float = 0.05  # strip is defective when its conformal p-value is <= alpha
     ocsvm_nu: float = 0.1  # One-Class SVM: upper bound on the training outlier fraction
     iforest_trees: int = 200
 
     def __post_init__(self):
         if self.scoring not in ("hybrid", "relative", "mahalanobis", "strip_mahalanobis", "ocsvm", "iforest"):
             raise ValueError(f"unknown scoring method {self.scoring!r}")
-        if self.reference not in ("per_fabric", "global"):
+        if self.reference not in ("per_fabric", "global", "in_domain"):
             raise ValueError(f"unknown reference {self.reference!r}")
         if self.k <= 0:
             raise ValueError("k must be positive")
-        if not 0.0 <= self.calibration_fraction < 1.0:
-            raise ValueError("calibration_fraction must be in [0, 1)")
+        if not 0.0 <= self.calibration_fraction < 1.0 or not 0.0 <= self.test_fraction < 1.0:
+            raise ValueError("calibration_fraction and test_fraction must be in [0, 1)")
+        if self.calibration_fraction + self.test_fraction >= 1.0:
+            raise ValueError("calibration_fraction + test_fraction must leave images to fit on")
+        if self.folds < 2:
+            raise ValueError("folds must be at least 2")
+        if not 0.0 < self.image_alpha < 1.0:
+            raise ValueError("image_alpha must be in (0, 1)")
 
 
 @dataclass(frozen=True)
 class RefineConfig:
     enabled: bool = True
-    size: int = 64  # fine window side, px
-    stride: int = 32
+    sizes: Tuple[int, ...] = (64,)  # cascade of fine window sides, px, coarse to fine; stride = size / 2
     k: float = 2.5  # tau_fine = mu + k * sigma of held-out fine-window Mahalanobis distances
 
     def __post_init__(self):
-        if not 0 < self.stride <= self.size:
-            raise ValueError("refine.stride must be in (0, refine.size]")
+        if not self.sizes or any(s <= 0 or s % 2 for s in self.sizes):
+            raise ValueError("refine.sizes must be positive even window sides")
+        if list(self.sizes) != sorted(self.sizes, reverse=True) or len(set(self.sizes)) != len(self.sizes):
+            raise ValueError("refine.sizes must be strictly decreasing (coarse to fine)")
+
+    def scales(self) -> Tuple[Tuple[int, int], ...]:
+        """(size, stride) of every refinement level."""
+        return tuple((s, s // 2) for s in self.sizes)
 
 
 @dataclass(frozen=True)
@@ -130,8 +146,8 @@ class PipelineConfig:
     seed: int = 0
 
     def __post_init__(self):
-        if self.refine.size >= self.patch.size:
-            raise ValueError("refine.size must be smaller than patch.size")
+        if self.refine.sizes[0] >= self.patch.size:
+            raise ValueError("refine.sizes must be smaller than patch.size")
 
     @classmethod
     def load(cls, path: Optional[Path] = None) -> "PipelineConfig":

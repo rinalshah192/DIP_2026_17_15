@@ -37,4 +37,26 @@ def test_refined_mask_keeps_only_flagged_fine_windows_inside_region():
 
 def test_refine_must_be_finer_than_patch():
     with pytest.raises(ValueError):
-        PipelineConfig(patch=PatchConfig(size=64, stride=64), refine=RefineConfig(size=64, stride=32))
+        PipelineConfig(patch=PatchConfig(size=64, stride=64), refine=RefineConfig(sizes=(64,)))
+
+
+@pytest.mark.parametrize("sizes", [(), (32, 64), (64, 64), (63,)])
+def test_refine_levels_must_be_even_and_coarse_to_fine(sizes):
+    with pytest.raises(ValueError):
+        RefineConfig(sizes=sizes)
+
+
+def test_refine_cascade_scales_use_half_stride():
+    assert RefineConfig(sizes=(64, 32)).scales() == ((64, 32), (32, 16))
+
+
+def test_cascade_keeps_only_fine_windows_inside_the_previous_level():
+    # Coarse region covers x < 128; level 64 flags only (0, 0); level 32 may only fire inside it
+    region = np.zeros((64, 256), bool)
+    region[:, :128] = True
+    c64 = np.array(window_coords(region.shape, 64, 64))
+    level1 = refined_mask(region, c64, np.where((c64 == [0, 0]).all(1), 9.0, 0.0), 5.0, 64) > 0
+    c32 = np.array(window_coords(region.shape, 32, 32))
+    hit = np.full(len(c32), 9.0)  # every 32x32 window looks anomalous
+    level2 = refined_mask(level1, c32, hit, 5.0, 32)
+    assert np.count_nonzero(level2) == 64 * 64 and level2[:, 64:].max() == 0

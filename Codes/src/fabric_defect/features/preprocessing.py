@@ -106,6 +106,14 @@ def window_coords(shape: Tuple[int, int], size: int, stride: int) -> List[Tuple[
     return [(y, x) for y in _window_starts(shape[0], size, stride) for x in _window_starts(shape[1], size, stride)]
 
 
+def window_sums(binary: np.ndarray, coords: np.ndarray, size: int) -> np.ndarray:
+    """Number of nonzero pixels of `binary` in each square window (summed-area table, O(1) per window)."""
+    sat = np.pad((np.asarray(binary) > 0).astype(np.int64).cumsum(0).cumsum(1), ((1, 0), (1, 0)))
+    coords = np.asarray(coords, dtype=np.int64).reshape(-1, 2)
+    y, x = coords[:, 0], coords[:, 1]
+    return sat[y + size, x + size] - sat[y, x + size] - sat[y + size, x] + sat[y, x]
+
+
 def _window_starts(length: int, size: int, stride: int) -> list:
     """Window start offsets that cover [0, length) and always include the last full window."""
     if length < size:

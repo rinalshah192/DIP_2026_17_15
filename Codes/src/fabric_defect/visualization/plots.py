@@ -76,3 +76,36 @@ def save_summary_charts(df: pd.DataFrame, chart_file: Path) -> Path:
     fig.savefig(chart_file, dpi=200, bbox_inches="tight")
     plt.close(fig)
     return chart_file
+
+
+def save_score_distributions(df: pd.DataFrame, out_file: Path) -> Path:
+    """Image scores (log scale) of defect-free vs defective test strips per fabric, plus the ROC curve."""
+    from sklearn.metrics import roc_curve
+
+    fig, ax = plt.subplots(1, 2, figsize=(14, 4.5), gridspec_kw={"width_ratios": [2.2, 1]})
+    fabrics = sorted(df["fabric_type"].unique())
+    for i, fab in enumerate(fabrics):
+        g = df[df["fabric_type"] == fab]
+        for defective, colour, dx in ((False, "tab:blue", -0.15), (True, "tab:red", 0.15)):
+            v = g.loc[g["is_defective"].astype(bool) == defective, "image_score"]
+            ax[0].scatter(np.full(len(v), i + dx), v, s=14, alpha=0.7, color=colour,
+                          label=("defective" if defective else "defect-free") if i == 0 else None)
+    ax[0].axhline(1.0, color="black", lw=0.8, ls="--", label="max window = tau")
+    ax[0].set_yscale("log")
+    ax[0].set_xticks(range(len(fabrics)), fabrics, rotation=30)
+    ax[0].set_ylabel("image score  S = max window score / tau")
+    ax[0].set_title("Image scores of test strips", fontweight="bold")
+    ax[0].legend(loc="upper left", fontsize=8)
+
+    y = df["is_defective"].astype(bool)
+    if 0 < y.sum() < len(y):
+        fpr, tpr, _ = roc_curve(y, df["image_score"])
+        ax[1].plot(fpr, tpr, color="tab:red")
+    ax[1].plot([0, 1], [0, 1], color="grey", lw=0.8, ls=":")
+    ax[1].set_xlabel("false-alarm rate")
+    ax[1].set_ylabel("detection rate")
+    ax[1].set_title("Image-level ROC", fontweight="bold")
+    fig.tight_layout()
+    fig.savefig(out_file, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    return out_file

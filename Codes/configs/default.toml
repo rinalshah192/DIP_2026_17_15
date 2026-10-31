@@ -34,13 +34,15 @@ regularization = 1e-4
 k = 2.5
 ocsvm_nu = 0.1
 iforest_trees = 200
-calibration_fraction = 0.25
-reference = "per_fabric"  # per_fabric (adaptive) | global (one model + tau for all fabrics)  # defect-free images held out per fabric to set tau
+calibration_fraction = 0.2 # defect-free images held out per fabric to set tau
+test_fraction = 0.2        # defect-free images held out per fabric as image-level negatives
+reference = "per_fabric"   # per_fabric (adaptive) | global (fixed) | in_domain (+ other strips' background, CV)
+folds = 5                  # in_domain cross-validation folds
+image_alpha = 0.05         # image-level decision: conformal p-value <= alpha  # defect-free images held out per fabric to set tau
 
-[refine]                  # 64x64 re-scoring inside flagged 256x256 patches
+[refine]                  # re-scoring inside flagged 256x256 patches, coarse to fine
 enabled = true
-size = 64
-stride = 32
+sizes = [64]               # e.g. [64, 32] for a two-level cascade; stride = size / 2
 k = 2.5
 
 [segment]

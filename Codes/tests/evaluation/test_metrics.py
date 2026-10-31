@@ -65,3 +65,19 @@ def test_pooled_metrics_weight_pixels_not_images():
     assert s["pixel_iou"] == 0.5  # mean of 1.0 and 0.0
     assert s["pooled_pixel_iou"] == 500 / (500 + 5 + 45)
     assert s["pooled_patch_f1"] == 1.0
+
+
+def test_image_level_metrics_and_defective_only_summaries():
+    from fabric_defect.evaluation.metrics import image_level_metrics
+    rows = []
+    for defective, pred, score in ((True, True, 3.0), (True, False, 0.8), (False, False, 0.5), (False, True, 2.0)):
+        rows.append({**evaluate_patch_classification([1, 0], [1, 0]),
+                     **evaluate_pixel_localization(np.full((2, 2), 255 if defective else 0, np.uint8),
+                                                   np.full((2, 2), 255 if defective else 0, np.uint8)),
+                     "is_defective": defective, "image_pred": pred, "image_score": score})
+    df = pd.DataFrame(rows)
+    m = image_level_metrics(df)
+    assert (m["n_pos"], m["n_neg"]) == (2, 2)
+    assert m["recall"] == 0.5 and m["specificity"] == 0.5 and m["auroc"] == 0.75
+    s = summarize(df)
+    assert s["n_images"] == 2 and s["image_auroc"] == 0.75  # patch/pixel over defective strips only

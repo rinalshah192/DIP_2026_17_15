@@ -20,11 +20,9 @@ from fabric_defect.core.config import PipelineConfig
 from fabric_defect.evaluation.metrics import summarize
 from fabric_defect.features.cache import load_features
 from fabric_defect.pipelines.benchmark import (
-    evaluate,
     feature_scales,
-    fit_models,
-    fit_refiners,
     load_manifest,
+    run_protocol,
     select_test,
     split_by_fabric,
     write_run_info,
@@ -81,16 +79,19 @@ def run_ablation(
     for i, (name, cfg) in enumerate(variants, 1):
         test = select_test(manifest[manifest["is_defective"]], cfg.max_test_samples)
         split = split_by_fabric(clean, cfg)
+        negatives = clean[clean["image_path"].isin([p for v in split.test.values() for p in v])]
         feats = load_features(clean["image_path"].tolist() + test["image_path"].tolist(),
                               cfg, feature_scales(cfg), cache_dir, workers)
-        results, _ = evaluate(test, feats, fit_models(feats, split, cfg), cfg,
-                              refiners=fit_refiners(feats, split, cfg))
+        results, _ = run_protocol(test, negatives, split, feats, cfg)
         results.to_csv(out_dir / f"{slug(name)}.csv", index=False)
+        refine = "+".join(str(s) for s in cfg.refine.sizes) if cfg.refine.enabled else "off"
         row = {"variant": name, "features": "+".join(cfg.features.use), "scoring": cfg.model.scoring,
-               "reference": cfg.model.reference, "refine": cfg.refine.enabled, **summarize(results)}
+               "reference": cfg.model.reference, "refine": refine, "label_px": cfg.patch.defect_min_pixels,
+               **summarize(results)}
         rows.append(row)
-        log.info("[%d/%d] %s: patch F1 %.2f%%, pixel IoU %.2f%% (n=%d)", i, len(variants), name,
-                 100 * row["patch_f1"], 100 * row["pixel_iou"], row["n_images"])
+        log.info("[%d/%d] %s: patch F1 %.2f%%, pixel IoU %.2f%%, image AUROC %.3f (n=%d)", i, len(variants),
+                 name, 100 * row["patch_f1"], 100 * row["pixel_iou"], row.get("image_auroc", float("nan")),
+                 row["n_images"])
 
     summary = pd.DataFrame(rows)
     summary.to_csv(out_dir / "summary.csv", index=False)

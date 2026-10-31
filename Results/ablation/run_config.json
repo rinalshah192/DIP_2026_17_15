@@ -1,7 +1,7 @@
 {
-  "started_utc": "2026-10-27T17:07:44+00:00",
+  "started_utc": "2026-10-31T10:48:08+00:00",
   "git": {
-    "sha": "5d2fcd6a74181c55a07fbf0e1c7a92768a5241bf",
+    "sha": "df6304133dfba40abf3c975a8ad9c22d44bca44b",
     "dirty": true
   },
   "data_dir": "/Users/varunhotani/Desktop/dip/data/raw",
@@ -91,15 +91,19 @@
       "scoring": "mahalanobis",
       "regularization": 0.0001,
       "k": 2.5,
-      "calibration_fraction": 0.25,
+      "calibration_fraction": 0.2,
+      "test_fraction": 0.2,
       "reference": "per_fabric",
+      "folds": 5,
+      "image_alpha": 0.05,
       "ocsvm_nu": 0.1,
       "iforest_trees": 200
     },
     "refine": {
       "enabled": true,
-      "size": 64,
-      "stride": 32,
+      "sizes": [
+        64
+      ],
       "k": 2.5
     },
     "segment": {
@@ -188,15 +192,19 @@
         "scoring": "mahalanobis",
         "regularization": 0.0001,
         "k": 2.5,
-        "calibration_fraction": 0.25,
+        "calibration_fraction": 0.2,
+        "test_fraction": 0.2,
         "reference": "per_fabric",
+        "folds": 5,
+        "image_alpha": 0.05,
         "ocsvm_nu": 0.1,
         "iforest_trees": 200
       },
       "refine": {
         "enabled": true,
-        "size": 64,
-        "stride": 32,
+        "sizes": [
+          64
+        ],
         "k": 2.5
       },
       "segment": {
@@ -282,15 +290,19 @@
         "scoring": "mahalanobis",
         "regularization": 0.0001,
         "k": 2.5,
-        "calibration_fraction": 0.25,
+        "calibration_fraction": 0.2,
+        "test_fraction": 0.2,
         "reference": "per_fabric",
+        "folds": 5,
+        "image_alpha": 0.05,
         "ocsvm_nu": 0.1,
         "iforest_trees": 200
       },
       "refine": {
         "enabled": true,
-        "size": 64,
-        "stride": 32,
+        "sizes": [
+          64
+        ],
         "k": 2.5
       },
       "segment": {
@@ -376,15 +388,19 @@
         "scoring": "mahalanobis",
         "regularization": 0.0001,
         "k": 2.5,
-        "calibration_fraction": 0.25,
+        "calibration_fraction": 0.2,
+        "test_fraction": 0.2,
         "reference": "per_fabric",
+        "folds": 5,
+        "image_alpha": 0.05,
         "ocsvm_nu": 0.1,
         "iforest_trees": 200
       },
       "refine": {
         "enabled": true,
-        "size": 64,
-        "stride": 32,
+        "sizes": [
+          64
+        ],
         "k": 2.5
       },
       "segment": {
@@ -470,15 +486,19 @@
         "scoring": "mahalanobis",
         "regularization": 0.0001,
         "k": 2.5,
-        "calibration_fraction": 0.25,
+        "calibration_fraction": 0.2,
+        "test_fraction": 0.2,
         "reference": "per_fabric",
+        "folds": 5,
+        "image_alpha": 0.05,
         "ocsvm_nu": 0.1,
         "iforest_trees": 200
       },
       "refine": {
         "enabled": true,
-        "size": 64,
-        "stride": 32,
+        "sizes": [
+          64
+        ],
         "k": 2.5
       },
       "segment": {
@@ -566,15 +586,19 @@
         "scoring": "mahalanobis",
         "regularization": 0.0001,
         "k": 2.5,
-        "calibration_fraction": 0.25,
+        "calibration_fraction": 0.2,
+        "test_fraction": 0.2,
         "reference": "per_fabric",
+        "folds": 5,
+        "image_alpha": 0.05,
         "ocsvm_nu": 0.1,
         "iforest_trees": 200
       },
       "refine": {
         "enabled": true,
-        "size": 64,
-        "stride": 32,
+        "sizes": [
+          64
+        ],
         "k": 2.5
       },
       "segment": {
@@ -661,15 +685,19 @@
         "scoring": "strip_mahalanobis",
         "regularization": 0.0001,
         "k": 2.5,
-        "calibration_fraction": 0.25,
+        "calibration_fraction": 0.2,
+        "test_fraction": 0.2,
         "reference": "per_fabric",
+        "folds": 5,
+        "image_alpha": 0.05,
         "ocsvm_nu": 0.1,
         "iforest_trees": 200
       },
       "refine": {
         "enabled": true,
-        "size": 64,
-        "stride": 32,
+        "sizes": [
+          64
+        ],
         "k": 2.5
       },
       "segment": {
@@ -756,15 +784,19 @@
         "scoring": "hybrid",
         "regularization": 0.0001,
         "k": 2.5,
-        "calibration_fraction": 0.25,
+        "calibration_fraction": 0.2,
+        "test_fraction": 0.2,
         "reference": "per_fabric",
+        "folds": 5,
+        "image_alpha": 0.05,
         "ocsvm_nu": 0.1,
         "iforest_trees": 200
       },
       "refine": {
         "enabled": true,
-        "size": 64,
-        "stride": 32,
+        "sizes": [
+          64
+        ],
         "k": 2.5
       },
       "segment": {
@@ -851,15 +883,19 @@
         "scoring": "relative",
         "regularization": 0.0001,
         "k": 2.5,
-        "calibration_fraction": 0.25,
+        "calibration_fraction": 0.2,
+        "test_fraction": 0.2,
         "reference": "per_fabric",
+        "folds": 5,
+        "image_alpha": 0.05,
         "ocsvm_nu": 0.1,
         "iforest_trees": 200
       },
       "refine": {
         "enabled": true,
-        "size": 64,
-        "stride": 32,
+        "sizes": [
+          64
+        ],
         "k": 2.5
       },
       "segment": {
@@ -946,15 +982,19 @@
         "scoring": "ocsvm",
         "regularization": 0.0001,
         "k": 2.5,
-        "calibration_fraction": 0.25,
+        "calibration_fraction": 0.2,
+        "test_fraction": 0.2,
         "reference": "per_fabric",
+        "folds": 5,
+        "image_alpha": 0.05,
         "ocsvm_nu": 0.1,
         "iforest_trees": 200
       },
       "refine": {
         "enabled": true,
-        "size": 64,
-        "stride": 32,
+        "sizes": [
+          64
+        ],
         "k": 2.5
       },
       "segment": {
@@ -1041,15 +1081,19 @@
         "scoring": "iforest",
         "regularization": 0.0001,
         "k": 2.5,
-        "calibration_fraction": 0.25,
+        "calibration_fraction": 0.2,
+        "test_fraction": 0.2,
         "reference": "per_fabric",
+        "folds": 5,
+        "image_alpha": 0.05,
         "ocsvm_nu": 0.1,
         "iforest_trees": 200
       },
       "refine": {
         "enabled": true,
-        "size": 64,
-        "stride": 32,
+        "sizes": [
+          64
+        ],
         "k": 2.5
       },
       "segment": {
@@ -1136,15 +1180,118 @@
         "scoring": "mahalanobis",
         "regularization": 0.0001,
         "k": 2.5,
-        "calibration_fraction": 0.25,
+        "calibration_fraction": 0.2,
+        "test_fraction": 0.2,
         "reference": "global",
+        "folds": 5,
+        "image_alpha": 0.05,
         "ocsvm_nu": 0.1,
         "iforest_trees": 200
       },
       "refine": {
         "enabled": true,
-        "size": 64,
-        "stride": 32,
+        "sizes": [
+          64
+        ],
+        "k": 2.5
+      },
+      "segment": {
+        "kernel_size": 5,
+        "min_area": 50
+      },
+      "max_test_samples": 0,
+      "seed": 0
+    },
+    "reference: in-domain (cross-validated)": {
+      "preprocess": {
+        "median_ksize": 3,
+        "gaussian_ksize": 0,
+        "gaussian_sigma": 1.0,
+        "contrast": "clahe",
+        "clahe_clip_limit": 2.0,
+        "clahe_grid": [
+          8,
+          8
+        ],
+        "illumination_sigma": 50.0,
+        "selvage_margin": 40
+      },
+      "patch": {
+        "size": 256,
+        "stride": 128,
+        "defect_min_pixels": 25
+      },
+      "glcm": {
+        "distances": [
+          1,
+          2,
+          3
+        ],
+        "angles_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "levels": 64,
+        "properties": [
+          "contrast",
+          "dissimilarity",
+          "homogeneity",
+          "energy",
+          "correlation"
+        ]
+      },
+      "lbp": {
+        "scales": [
+          [
+            8,
+            1
+          ],
+          [
+            16,
+            2
+          ]
+        ]
+      },
+      "gabor": {
+        "orientations_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "wavelengths": [
+          4.0,
+          8.0,
+          16.0
+        ],
+        "bandwidth": 1.0,
+        "gamma": 0.5
+      },
+      "features": {
+        "use": [
+          "glcm",
+          "lbp"
+        ]
+      },
+      "model": {
+        "scoring": "mahalanobis",
+        "regularization": 0.0001,
+        "k": 2.5,
+        "calibration_fraction": 0.2,
+        "test_fraction": 0.2,
+        "reference": "in_domain",
+        "folds": 5,
+        "image_alpha": 0.05,
+        "ocsvm_nu": 0.1,
+        "iforest_trees": 200
+      },
+      "refine": {
+        "enabled": true,
+        "sizes": [
+          64
+        ],
         "k": 2.5
       },
       "segment": {
@@ -1231,15 +1378,19 @@
         "scoring": "mahalanobis",
         "regularization": 0.0001,
         "k": 2.0,
-        "calibration_fraction": 0.25,
+        "calibration_fraction": 0.2,
+        "test_fraction": 0.2,
         "reference": "per_fabric",
+        "folds": 5,
+        "image_alpha": 0.05,
         "ocsvm_nu": 0.1,
         "iforest_trees": 200
       },
       "refine": {
         "enabled": true,
-        "size": 64,
-        "stride": 32,
+        "sizes": [
+          64
+        ],
         "k": 2.5
       },
       "segment": {
@@ -1326,15 +1477,19 @@
         "scoring": "mahalanobis",
         "regularization": 0.0001,
         "k": 3.0,
-        "calibration_fraction": 0.25,
+        "calibration_fraction": 0.2,
+        "test_fraction": 0.2,
         "reference": "per_fabric",
+        "folds": 5,
+        "image_alpha": 0.05,
         "ocsvm_nu": 0.1,
         "iforest_trees": 200
       },
       "refine": {
         "enabled": true,
-        "size": 64,
-        "stride": 32,
+        "sizes": [
+          64
+        ],
         "k": 2.5
       },
       "segment": {
@@ -1421,15 +1576,416 @@
         "scoring": "mahalanobis",
         "regularization": 0.0001,
         "k": 2.5,
-        "calibration_fraction": 0.25,
+        "calibration_fraction": 0.2,
+        "test_fraction": 0.2,
         "reference": "per_fabric",
+        "folds": 5,
+        "image_alpha": 0.05,
         "ocsvm_nu": 0.1,
         "iforest_trees": 200
       },
       "refine": {
         "enabled": false,
-        "size": 64,
-        "stride": 32,
+        "sizes": [
+          64
+        ],
+        "k": 2.5
+      },
+      "segment": {
+        "kernel_size": 5,
+        "min_area": 50
+      },
+      "max_test_samples": 0,
+      "seed": 0
+    },
+    "refine: 64 then 32": {
+      "preprocess": {
+        "median_ksize": 3,
+        "gaussian_ksize": 0,
+        "gaussian_sigma": 1.0,
+        "contrast": "clahe",
+        "clahe_clip_limit": 2.0,
+        "clahe_grid": [
+          8,
+          8
+        ],
+        "illumination_sigma": 50.0,
+        "selvage_margin": 40
+      },
+      "patch": {
+        "size": 256,
+        "stride": 128,
+        "defect_min_pixels": 25
+      },
+      "glcm": {
+        "distances": [
+          1,
+          2,
+          3
+        ],
+        "angles_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "levels": 64,
+        "properties": [
+          "contrast",
+          "dissimilarity",
+          "homogeneity",
+          "energy",
+          "correlation"
+        ]
+      },
+      "lbp": {
+        "scales": [
+          [
+            8,
+            1
+          ],
+          [
+            16,
+            2
+          ]
+        ]
+      },
+      "gabor": {
+        "orientations_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "wavelengths": [
+          4.0,
+          8.0,
+          16.0
+        ],
+        "bandwidth": 1.0,
+        "gamma": 0.5
+      },
+      "features": {
+        "use": [
+          "glcm",
+          "lbp"
+        ]
+      },
+      "model": {
+        "scoring": "mahalanobis",
+        "regularization": 0.0001,
+        "k": 2.5,
+        "calibration_fraction": 0.2,
+        "test_fraction": 0.2,
+        "reference": "per_fabric",
+        "folds": 5,
+        "image_alpha": 0.05,
+        "ocsvm_nu": 0.1,
+        "iforest_trees": 200
+      },
+      "refine": {
+        "enabled": true,
+        "sizes": [
+          64,
+          32
+        ],
+        "k": 2.5
+      },
+      "segment": {
+        "kernel_size": 5,
+        "min_area": 50
+      },
+      "max_test_samples": 0,
+      "seed": 0
+    },
+    "refine: 32 only": {
+      "preprocess": {
+        "median_ksize": 3,
+        "gaussian_ksize": 0,
+        "gaussian_sigma": 1.0,
+        "contrast": "clahe",
+        "clahe_clip_limit": 2.0,
+        "clahe_grid": [
+          8,
+          8
+        ],
+        "illumination_sigma": 50.0,
+        "selvage_margin": 40
+      },
+      "patch": {
+        "size": 256,
+        "stride": 128,
+        "defect_min_pixels": 25
+      },
+      "glcm": {
+        "distances": [
+          1,
+          2,
+          3
+        ],
+        "angles_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "levels": 64,
+        "properties": [
+          "contrast",
+          "dissimilarity",
+          "homogeneity",
+          "energy",
+          "correlation"
+        ]
+      },
+      "lbp": {
+        "scales": [
+          [
+            8,
+            1
+          ],
+          [
+            16,
+            2
+          ]
+        ]
+      },
+      "gabor": {
+        "orientations_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "wavelengths": [
+          4.0,
+          8.0,
+          16.0
+        ],
+        "bandwidth": 1.0,
+        "gamma": 0.5
+      },
+      "features": {
+        "use": [
+          "glcm",
+          "lbp"
+        ]
+      },
+      "model": {
+        "scoring": "mahalanobis",
+        "regularization": 0.0001,
+        "k": 2.5,
+        "calibration_fraction": 0.2,
+        "test_fraction": 0.2,
+        "reference": "per_fabric",
+        "folds": 5,
+        "image_alpha": 0.05,
+        "ocsvm_nu": 0.1,
+        "iforest_trees": 200
+      },
+      "refine": {
+        "enabled": true,
+        "sizes": [
+          32
+        ],
+        "k": 2.5
+      },
+      "segment": {
+        "kernel_size": 5,
+        "min_area": 50
+      },
+      "max_test_samples": 0,
+      "seed": 0
+    },
+    "patch label: any defect pixel": {
+      "preprocess": {
+        "median_ksize": 3,
+        "gaussian_ksize": 0,
+        "gaussian_sigma": 1.0,
+        "contrast": "clahe",
+        "clahe_clip_limit": 2.0,
+        "clahe_grid": [
+          8,
+          8
+        ],
+        "illumination_sigma": 50.0,
+        "selvage_margin": 40
+      },
+      "patch": {
+        "size": 256,
+        "stride": 128,
+        "defect_min_pixels": 0
+      },
+      "glcm": {
+        "distances": [
+          1,
+          2,
+          3
+        ],
+        "angles_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "levels": 64,
+        "properties": [
+          "contrast",
+          "dissimilarity",
+          "homogeneity",
+          "energy",
+          "correlation"
+        ]
+      },
+      "lbp": {
+        "scales": [
+          [
+            8,
+            1
+          ],
+          [
+            16,
+            2
+          ]
+        ]
+      },
+      "gabor": {
+        "orientations_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "wavelengths": [
+          4.0,
+          8.0,
+          16.0
+        ],
+        "bandwidth": 1.0,
+        "gamma": 0.5
+      },
+      "features": {
+        "use": [
+          "glcm",
+          "lbp"
+        ]
+      },
+      "model": {
+        "scoring": "mahalanobis",
+        "regularization": 0.0001,
+        "k": 2.5,
+        "calibration_fraction": 0.2,
+        "test_fraction": 0.2,
+        "reference": "per_fabric",
+        "folds": 5,
+        "image_alpha": 0.05,
+        "ocsvm_nu": 0.1,
+        "iforest_trees": 200
+      },
+      "refine": {
+        "enabled": true,
+        "sizes": [
+          64
+        ],
+        "k": 2.5
+      },
+      "segment": {
+        "kernel_size": 5,
+        "min_area": 50
+      },
+      "max_test_samples": 0,
+      "seed": 0
+    },
+    "image alpha = 0.10": {
+      "preprocess": {
+        "median_ksize": 3,
+        "gaussian_ksize": 0,
+        "gaussian_sigma": 1.0,
+        "contrast": "clahe",
+        "clahe_clip_limit": 2.0,
+        "clahe_grid": [
+          8,
+          8
+        ],
+        "illumination_sigma": 50.0,
+        "selvage_margin": 40
+      },
+      "patch": {
+        "size": 256,
+        "stride": 128,
+        "defect_min_pixels": 25
+      },
+      "glcm": {
+        "distances": [
+          1,
+          2,
+          3
+        ],
+        "angles_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "levels": 64,
+        "properties": [
+          "contrast",
+          "dissimilarity",
+          "homogeneity",
+          "energy",
+          "correlation"
+        ]
+      },
+      "lbp": {
+        "scales": [
+          [
+            8,
+            1
+          ],
+          [
+            16,
+            2
+          ]
+        ]
+      },
+      "gabor": {
+        "orientations_deg": [
+          0.0,
+          45.0,
+          90.0,
+          135.0
+        ],
+        "wavelengths": [
+          4.0,
+          8.0,
+          16.0
+        ],
+        "bandwidth": 1.0,
+        "gamma": 0.5
+      },
+      "features": {
+        "use": [
+          "glcm",
+          "lbp"
+        ]
+      },
+      "model": {
+        "scoring": "mahalanobis",
+        "regularization": 0.0001,
+        "k": 2.5,
+        "calibration_fraction": 0.2,
+        "test_fraction": 0.2,
+        "reference": "per_fabric",
+        "folds": 5,
+        "image_alpha": 0.1,
+        "ocsvm_nu": 0.1,
+        "iforest_trees": 200
+      },
+      "refine": {
+        "enabled": true,
+        "sizes": [
+          64
+        ],
         "k": 2.5
       },
       "segment": {
@@ -1516,15 +2072,19 @@
         "scoring": "hybrid",
         "regularization": 0.0001,
         "k": 2.5,
-        "calibration_fraction": 0.25,
+        "calibration_fraction": 0.2,
+        "test_fraction": 0.2,
         "reference": "per_fabric",
+        "folds": 5,
+        "image_alpha": 0.05,
         "ocsvm_nu": 0.1,
         "iforest_trees": 200
       },
       "refine": {
         "enabled": false,
-        "size": 64,
-        "stride": 32,
+        "sizes": [
+          64
+        ],
         "k": 2.5
       },
       "segment": {

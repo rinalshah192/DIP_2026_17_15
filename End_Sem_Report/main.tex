@@ -179,7 +179,7 @@ Table~\ref{tab:progress} traces the project. The one-class system improved betwe
   \item $256\times256$ patches: F1 62.3\,\%
   \item image level: accuracy 80.8\,\% (75 of 105 defective strips found, 17 false alarms in 140 defect-free strips), F1 76.1\,\%
 \end{itemize}
-On fabric 03, whose two capture sets match best, image accuracy is 88.2\,\% and image F1 90.3\,\%. Validation selected the $16\times16$ map in 4 of 5 folds (the 16/32 mean in one), the pixel stage in 2 and Hough linking in 3. Fig.~\ref{fig:examples} shows two held-out strips.
+On fabric 03, whose two capture sets match best, image accuracy is 88.2\,\% and image F1 90.3\,\%. Validation selected the $16\times16$ map in 4 of 5 folds (the 16/32 mean in one), the pixel stage in 2 and Hough linking in 3. In the ablation (Table~\ref{tab:ablation}), removing the pixel stage lowers pooled pixel F1 from 34.5 to 32.4\,\%, and $32\times32$-only windows reach 33.4\,\%. Fig.~\ref{fig:examples} shows two held-out strips.
 
 %=====================================================================
 \section{Discussion}

@@ -16,6 +16,8 @@ Patch and pixel metrics are summarised over defective strips only; image-level
 metrics need both kinds.
 """
 
+import re
+
 import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score
@@ -125,6 +127,14 @@ def summarize(df: pd.DataFrame) -> Dict[str, float]:
         pred, gt = float(df["pred_defect_pixels"].sum()), float(df["gt_defect_pixels"].sum())
         out.update(pooled_pixel_iou=_ratio(ptp, pred + gt - ptp), pooled_pixel_dice=_ratio(2 * ptp, pred + gt),
                    pooled_pixel_precision=_ratio(ptp, pred), pooled_pixel_recall=_ratio(ptp, gt))
+    for prefix in sorted({c[:-3] for c in df.columns if re.fullmatch(r"window\d*_tp", c)}):
+        # window decisions of the supervised detector (e.g. window16_, window32_): finer than 256x256 patches
+        tp, fp, fn = (float(df[f"{prefix}_{k}"].sum()) for k in ("tp", "fp", "fn"))
+        out.update({f"{prefix}_{m}": float(df[f"{prefix}_{m}"].mean()) for m in ("precision", "recall", "f1", "auroc")
+                    if f"{prefix}_{m}" in df})
+        out.update({f"pooled_{prefix}_precision": _ratio(tp, tp + fp), f"pooled_{prefix}_recall": _ratio(tp, tp + fn),
+                    f"pooled_{prefix}_f1": _ratio(2 * tp, 2 * tp + fp + fn),
+                    f"pooled_{prefix}_iou": _ratio(tp, tp + fp + fn)})
     if "image_pred" in full.columns:
         out.update({f"image_{k}": v for k, v in image_level_metrics(full).items()})
     return out

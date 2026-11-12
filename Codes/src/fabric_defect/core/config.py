@@ -132,6 +132,40 @@ class SegmentConfig:
 
 
 @dataclass(frozen=True)
+class SupervisedConfig:
+    """Supervised (mask-trained) detector, evaluated by strip-grouped cross-validation."""
+
+    window: int = 16  # finest classified window side, px; stride = window / 2
+    ensemble: Tuple[int, ...] = (32,)  # extra window sizes whose maps compete / are averaged on validation
+    context: Tuple[int, ...] = (32, 64, 256)  # windows (larger than the classified one) adding context
+    folds: int = 5  # outer cross-validation folds, grouped by strip and stratified by (defective, fabric)
+    validation_fraction: float = 0.25  # of each training fold's strips, held out to pick thresholds
+    negatives_per_positive: int = 20  # defect-free windows sampled per defect window, per strip
+    min_negatives: int = 300  # defect-free windows sampled at least, per strip (defect-free strips)
+    max_iter: int = 1000  # upper bound on gradient-boosting rounds (early stopping picks the number)
+    early_stopping: bool = True
+    n_iter_no_change: int = 30
+    learning_rate: float = 0.08
+    max_leaf_nodes: int = 31
+    pixel_stage: bool = True  # per-pixel classifier; validation decides whether its mask is used
+    pixel_samples: int = 3000  # defect pixels (and as many near-defect + random others) per strip
+    hough_linking: bool = True  # let validation decide whether Hough line linking is applied
+
+    def __post_init__(self):
+        sizes = (self.window,) + tuple(self.ensemble)
+        if any(s <= 0 or s % 2 for s in sizes) or self.window in self.ensemble:
+            raise ValueError("supervised.window and ensemble sizes must be distinct, positive and even")
+        if not any(c > self.window for c in self.context):
+            raise ValueError("supervised.context needs at least one window larger than supervised.window")
+        if self.folds < 2 or not 0.0 < self.validation_fraction < 1.0:
+            raise ValueError("supervised.folds >= 2 and validation_fraction in (0, 1) required")
+
+    def levels(self) -> Tuple[int, ...]:
+        """Classified window sizes, finest first."""
+        return tuple(sorted((self.window,) + tuple(self.ensemble)))
+
+
+@dataclass(frozen=True)
 class PipelineConfig:
     preprocess: PreprocessConfig = field(default_factory=PreprocessConfig)
     patch: PatchConfig = field(default_factory=PatchConfig)
@@ -142,10 +176,14 @@ class PipelineConfig:
     model: ModelConfig = field(default_factory=ModelConfig)
     refine: RefineConfig = field(default_factory=RefineConfig)
     segment: SegmentConfig = field(default_factory=SegmentConfig)
+    supervised: SupervisedConfig = field(default_factory=SupervisedConfig)
+    method: str = "one_class"  # "one_class" (defect-free references) or "supervised" (mask-trained, strip CV)
     max_test_samples: int = 0  # 0 = every defective strip; n = n strips stratified by fabric
     seed: int = 0
 
     def __post_init__(self):
+        if self.method not in ("one_class", "supervised"):
+            raise ValueError(f"unknown method {self.method!r}")
         if self.refine.sizes[0] >= self.patch.size:
             raise ValueError("refine.sizes must be smaller than patch.size")
 

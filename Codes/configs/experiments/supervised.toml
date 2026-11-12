@@ -1,0 +1,17 @@
+# Supervised detector ablation (each variant is a full strip-grouped 5-fold CV on AFID).
+# Run: python -m fabric_defect ablate --grid Codes/configs/experiments/supervised.toml \
+#        --out Results/ablation_supervised --workers 8
+
+base = "../default.toml"
+
+[[variant]]
+name = "final: 16x16 + 32x32 ensemble, pixel stage, Hough"
+overrides = { method = "supervised" }
+
+[[variant]]
+name = "32x32 windows only"
+overrides = { method = "supervised", supervised = { window = 32, ensemble = [], context = [64, 256] } }
+
+[[variant]]
+name = "16x16 + 32x32, no pixel stage"
+overrides = { method = "supervised", supervised = { pixel_stage = false } }

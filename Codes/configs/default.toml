@@ -1,6 +1,7 @@
 # Default pipeline configuration (mirrors the dataclass defaults in fabric_defect/config.py).
 # Any key may be removed; missing keys fall back to the defaults.
 
+method = "one_class"       # one_class (defect-free references) | supervised (mask-trained, strip-grouped CV)
 max_test_samples = 0     # 0 = every defective strip
 seed = 0
 
@@ -57,3 +58,20 @@ gamma = 0.5
 
 [features]
 use = ["glcm", "lbp"]            # any of glcm, lbp, gabor (gabor did not help under Mahalanobis)
+
+[supervised]               # used when method = "supervised"
+window = 16                # finest classified window side; stride = window / 2
+ensemble = [32]            # extra classified window sizes; validation picks 16, 32 or their mean map
+context = [32, 64, 256]    # surrounding windows whose strip-normalised features add context
+folds = 5                  # outer CV folds, grouped by strip, stratified by (defective, fabric)
+validation_fraction = 0.25 # of each training fold, held out to choose every threshold
+negatives_per_positive = 20
+min_negatives = 300        # defect-free windows sampled per strip at least
+max_iter = 1000            # upper bound; early stopping picks the number of boosting rounds
+early_stopping = true
+n_iter_no_change = 30
+learning_rate = 0.08
+max_leaf_nodes = 31
+pixel_stage = true         # per-pixel classifier; validation decides whether its mask is used
+pixel_samples = 3000       # per strip: defect pixels, as many near-defect and as many random pixels
+hough_linking = true       # validation decides whether / how Hough line linking is applied

@@ -16,6 +16,8 @@ Patch and pixel metrics are summarised over defective strips only; image-level
 metrics need both kinds.
 """
 
+import re
+
 import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score
@@ -87,7 +89,7 @@ def evaluate_pixel_localization(
     precision = _ratio(intersection, p_count)
     recall = _ratio(intersection, g_count)
 
-    return {
+    out = {
         "pixel_iou": iou,
         "pixel_dice": dice,
         "pixel_precision": precision,
@@ -96,6 +98,28 @@ def evaluate_pixel_localization(
         "pred_defect_pixels": int(p_count),
         "pixel_tp": int(intersection),  # kept so pooled metrics can be summed over images
     }
+    for r in TOLERANCES:
+        out.update(tolerant_pixel_metrics(p_bin, g_bin, r))
+    return out
+
+
+TOLERANCES = (2, 3)  # px; thin-structure detection usually allows a small misalignment
+
+
+def tolerant_pixel_metrics(pred: np.ndarray, gt: np.ndarray, r: int) -> Dict[str, float]:
+    """Precision / recall / F1 with an r-pixel tolerance, as in thin-structure (crack) detection:
+    a predicted pixel is correct if a ground-truth pixel lies within r px of it, and a ground-truth
+    pixel is found if a prediction lies within r px of it."""
+    import cv2
+
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
+    near_gt = cv2.dilate(gt.astype(np.uint8), k) > 0
+    near_pred = cv2.dilate(pred.astype(np.uint8), k) > 0
+    tp_pred, tp_gt = int((pred & near_gt).sum()), int((gt & near_pred).sum())
+    prec, rec = _ratio(tp_pred, int(pred.sum())), _ratio(tp_gt, int(gt.sum()))
+    f1 = 2 * prec * rec / (prec + rec) if prec + rec > 0 else (float("nan") if np.isnan(prec + rec) else 0.0)
+    return {f"pixel_tol{r}_precision": prec, f"pixel_tol{r}_recall": rec, f"pixel_tol{r}_f1": f1,
+            f"pixel_tol{r}_tp_pred": tp_pred, f"pixel_tol{r}_tp_gt": tp_gt}
 
 
 SUMMARY_METRICS = (
@@ -125,6 +149,21 @@ def summarize(df: pd.DataFrame) -> Dict[str, float]:
         pred, gt = float(df["pred_defect_pixels"].sum()), float(df["gt_defect_pixels"].sum())
         out.update(pooled_pixel_iou=_ratio(ptp, pred + gt - ptp), pooled_pixel_dice=_ratio(2 * ptp, pred + gt),
                    pooled_pixel_precision=_ratio(ptp, pred), pooled_pixel_recall=_ratio(ptp, gt))
+    for prefix in sorted({c[:-3] for c in df.columns if re.fullmatch(r"window\d*_tp", c)}):
+        # window decisions of the supervised detector (e.g. window16_, window32_): finer than 256x256 patches
+        tp, fp, fn = (float(df[f"{prefix}_{k}"].sum()) for k in ("tp", "fp", "fn"))
+        out.update({f"{prefix}_{m}": float(df[f"{prefix}_{m}"].mean()) for m in ("precision", "recall", "f1", "auroc")
+                    if f"{prefix}_{m}" in df})
+        out.update({f"pooled_{prefix}_precision": _ratio(tp, tp + fp), f"pooled_{prefix}_recall": _ratio(tp, tp + fn),
+                    f"pooled_{prefix}_f1": _ratio(2 * tp, 2 * tp + fp + fn),
+                    f"pooled_{prefix}_iou": _ratio(tp, tp + fp + fn)})
+    for r in TOLERANCES:
+        if f"pixel_tol{r}_tp_pred" in df.columns and len(df):
+            pp = _ratio(float(df[f"pixel_tol{r}_tp_pred"].sum()), float(df["pred_defect_pixels"].sum()))
+            pr = _ratio(float(df[f"pixel_tol{r}_tp_gt"].sum()), float(df["gt_defect_pixels"].sum()))
+            out.update({f"pixel_tol{r}_f1": float(df[f"pixel_tol{r}_f1"].mean()),
+                        f"pooled_pixel_tol{r}_precision": pp, f"pooled_pixel_tol{r}_recall": pr,
+                        f"pooled_pixel_tol{r}_f1": 2 * pp * pr / (pp + pr) if pp + pr > 0 else float("nan")})
     if "image_pred" in full.columns:
         out.update({f"image_{k}": v for k, v in image_level_metrics(full).items()})
     return out

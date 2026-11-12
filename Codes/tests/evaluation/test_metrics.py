@@ -81,3 +81,16 @@ def test_image_level_metrics_and_defective_only_summaries():
     assert m["recall"] == 0.5 and m["specificity"] == 0.5 and m["auroc"] == 0.75
     s = summarize(df)
     assert s["n_images"] == 2 and s["image_auroc"] == 0.75  # patch/pixel over defective strips only
+
+
+def test_tolerance_metrics_forgive_small_misalignment():
+    from fabric_defect.evaluation.metrics import tolerant_pixel_metrics
+    gt = np.zeros((20, 100), bool)
+    gt[10, :] = True  # a 1-px broken pick
+    pred = np.zeros_like(gt)
+    pred[12, :] = True  # found, but 2 px off
+    strict = evaluate_pixel_localization(pred.astype(np.uint8) * 255, gt.astype(np.uint8) * 255)
+    assert strict["pixel_iou"] == 0.0
+    m = tolerant_pixel_metrics(pred, gt, 2)
+    assert m["pixel_tol2_precision"] == 1.0 and m["pixel_tol2_recall"] == 1.0 and m["pixel_tol2_f1"] == 1.0
+    assert tolerant_pixel_metrics(pred, gt, 1)["pixel_tol1_f1"] == 0.0

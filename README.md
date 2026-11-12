@@ -4,7 +4,26 @@ ECE501 Digital Image Processing, Group 15 (Rinal Shah, Varun Hotani, Aadi Mehta,
 
 This project detects and localizes defects in woven fabric using **classical texture descriptors only**, with no deep learning. It runs on the [AITEX Fabric Image Database (AFID)](https://www.aitex.es/afid/).
 
-For each fabric, a model of normal texture is built from defect-free images. Every 256×256 window of a test strip is scored against its fabric's model. Flagged windows are then re-examined at 64×64 to produce a pixel mask. Each strip also gets an image-level decision with a calibrated confidence.
+The project has two detectors that share the same pre-processing and texture descriptors.
+
+**Supervised detector (final, `--method supervised`).**
+- Gradient-boosted trees are trained on AFID's defect masks. They classify every **16×16** window from its GLCM, LBP and Gabor descriptors, plus context from the 32×32, 64×64 and 256×256 windows around it.
+- Optionally, a per-pixel filter-bank classifier and Hough line linking refine the result.
+- Evaluation is 5-fold cross-validation **grouped by strip**: no test strip, nor any threshold choice, ever sees its pixels.
+
+**One-class detector (Weeks 3–7, default `run`).**
+- For each fabric, a model of normal texture is built from defect-free images only.
+- Every 256×256 window of a test strip is scored against its fabric's model, and flagged windows are re-examined at 64×64 to produce a pixel mask.
+- Each strip also gets an image-level decision with a calibrated confidence.
+
+```
+supervised:  strip ─► ROI, flattening, median, CLAHE ─► 16×16 windows (stride 8) ─► GLCM + LBP + Gabor
+             + strip-normalised copies + 32/64/256 context ─► boosted trees (16×16 and 32×32 maps)
+             ─► [pixel filter bank ─► boosted trees] ─► [Hough line linking] ─► mask
+             (map, mask type, every threshold and Hough setting chosen by F1 on validation strips)
+```
+
+One-class pipeline:
 
 ```
 strip ─► fabric ROI ─► illumination flattening ─► median ─► CLAHE
@@ -38,7 +57,7 @@ Codes/                              # all source code (course-required folder)
     pipelines/benchmark.py          # end-to-end run
     pipelines/ablation.py           # runs an ablation grid on shared features
     visualization/plots.py          # inspection figures and charts
-  tests/                            # mirrors the package; 86 tests
+  tests/                            # mirrors the package; 103 tests
 Results/final/                      # full AFID benchmark with the default config
 Results/ablation/                   # one CSV per ablation variant + summary.csv
 Results/legacy/                     # mid-semester CSVs and early synthetic figures (kept for reference)
@@ -112,7 +131,13 @@ The pipeline handles these quirks in the published archives:
 ## 3. Run
 
 ```bash
-# Full benchmark: every defective strip with a mask (105), default config, 8 processes
+# Final supervised detector: strip-grouped 5-fold CV over all 245 usable strips (about 45 min)
+python -m fabric_defect run --method supervised --out Results/final_supervised --workers 8
+
+# Supervised ablation (16x16 + 32x32 / 32x32 only / no pixel stage; each a full CV)
+python -m fabric_defect ablate --grid Codes/configs/experiments/supervised.toml --out Results/ablation_supervised --workers 8
+
+# One-class benchmark: every defective strip with a mask (105), default config, 8 processes
 python -m fabric_defect run --out Results/final --workers 8
 
 # The Week-6 ablation grid: 15 variants on shared, cached features (under a minute once features are cached)
@@ -200,32 +225,33 @@ All parameters live in `Codes/configs/default.toml`, which mirrors `src/fabric_d
 
 ---
 
-## 5. Results (AFID: 105 defective + 28 held-out defect-free strips)
+## 5. Results (AFID: 105 defective + 140 defect-free strips)
 
-Full tables are in `Results/final/` and `Results/ablation/summary.csv`; discussion is in `reports/week-7/Week_7_Report.pdf`.
+**Final supervised detector.** Evaluation is strip-grouped 5-fold cross-validation: every strip is scored once by models that never saw it, and every threshold is chosen on validation strips. Values are pooled (TP/FP/FN summed over strips) unless marked. Full tables are in `Results/final_supervised/` and `Results/AFID_results.xlsx`; discussion is in `reports/week-8/Week_8_Report.pdf` and `End_Sem_Report/main.pdf`.
 
-**Localization** (105 defective strips; window AUROC is threshold-free, 0.5 = chance):
-
-| Setting | Patch F1 | Pooled patch F1 | Window AUROC | Pixel IoU | Pixel recall |
-|---|---|---|---|---|---|
-| Week-5 setting (hybrid, GLCM+LBP, no refinement) | 14.01 % | 14.85 % | 0.574 | 0.30 % | 32.88 % |
-| **Default** (Mahalanobis, GLCM+LBP, 64×64 refinement) | **18.38 %** | **23.02 %** | 0.536 | 1.36 % | 48.41 % |
-| Refinement cascade 64 → 32 | 18.38 % | 23.02 % | 0.536 | 1.52 % | 43.75 % |
-| Fixed global reference instead of per-fabric | 5.77 % | 12.02 % | 0.461 | 0.08 % | 22.82 % |
-| In-domain reference (cross-validated) | 7.86 % | 12.54 % | **0.609** | 0.35 % | 10.60 % |
-| One-Class SVM baseline | 16.71 % | 23.43 % | 0.572 | 1.32 % | 43.70 % |
-
-**Image level** (defective vs defect-free strip, conformal confidence, α = 0.05):
-
-| Setting | Accuracy | Detection rate | False-alarm rate | AUROC |
+| Level | Precision | Recall | F1 | IoU |
 |---|---|---|---|---|
-| **Default** | **68.42 %** | 60.00 % | **0 / 28** | 0.790 |
-| Gabor features only | 72.93 % | 65.71 % | 0 / 28 | **0.878** |
-| Week-5 setting | 49.62 % | 36.19 % | 0 / 28 | 0.675 |
+| Pixel | 52.3 % | 25.8 % | 34.5 % | **20.9 %** |
+| Pixel, without strip `0080_036_01`* | 52.2 % | 49.1 % | 50.6 % | **33.9 %** |
+| Pixel, ±3 px tolerance | 65.3 % | 29.2 % | 40.4 % | – |
+| Pixel, mean per strip | 28.8 % | 40.6 % | 21.1 % | 14.0 % |
+| 16×16 windows (AUROC 0.980) | 58.0 % | 35.0 % | 43.7 % | 28.0 % |
+| 32×32 windows | 54.7 % | 38.7 % | 45.3 % | 29.3 % |
+| 256×256 patches (AUROC 0.968) | 60.3 % | 64.3 % | **62.3 %** | 45.2 % |
+| Image: defective or not (AUROC 0.865) | 81.5 % | 71.4 % | 76.1 % | accuracy **80.8 %** |
 
-Key findings:
-- For 5 of the 7 fabrics, AFID's defect-free and defective strips differ systematically (a capture shift). This inflates image-level scores on those fabrics. Fabrics 03, 04 and 06 are the fair test.
-- Within a strip, the descriptors rank defect windows only slightly above background (window AUROC 0.54). That, not the threshold or the scorer, limits precision.
+\* That one weft-crack strip holds 48 % of all defect pixels in AFID. It is detected, but few of its pixels are recovered, so the pooled pixel numbers are shown with and without it.
+
+- Image accuracy per fabric ranges from 74 % to 95 %. Fabric 03 reaches 88.2 %, with F1 90.3 %.
+- Per defect class, line defects do best: broken pick 54 % pixel F1, broken end 50 %. Fuzzy balls are found (window AUROC 0.97) but hard to outline (11 % pixel F1).
+
+**One-class baseline (Weeks 3–7, `Results/final/`):**
+- pooled pixel IoU 1.1 %
+- patch F1 23.0 %
+- window AUROC 0.536
+- image accuracy 68.4 % against 28 held-out defect-free strips
+
+The gap is the main finding: with the *same* texture descriptors, learning what defects look like works, while modelling only normal texture cannot cope with the shift between AFID's defect-free and defective captures.
 
 Earlier numbers are in `Results/legacy/` and should not be reused:
 - the mid-semester 13-image CSVs, whose defect labels came from the old code map
@@ -236,7 +262,7 @@ Earlier numbers are in `Results/legacy/` and should not be reused:
 ## 6. Tests and CI
 
 ```bash
-pytest Codes/tests -q        # 86 tests, about 2.5 min (includes synthetic end-to-end runs)
+pytest Codes/tests -q        # 103 tests, about 5-7 min (includes synthetic end-to-end runs)
 ```
 
 The tests mirror the package layout. They cover:

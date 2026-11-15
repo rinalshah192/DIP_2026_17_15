@@ -39,3 +39,18 @@ def test_synthetic_end_to_end(tmp_path):
 
     info = json.loads((out / "run_config.json").read_text())
     assert info["synthetic"] is True and info["config"]["patch"]["stride"] == 256
+
+
+def test_supervised_cv_end_to_end(tmp_path):
+    cfg = tmp_path / "sup.toml"
+    cfg.write_text('method = "supervised"\n[patch]\nstride = 256\n[refine]\nenabled = false\n'
+                   '[supervised]\nwindow = 64\nensemble = []\ncontext = [256]\nfolds = 2\nmax_iter = 20\npixel_stage = false\n')
+    out = tmp_path / "out"
+    assert main(["run", "--synthetic", "--out", str(out), "--config", str(cfg)]) == 0
+    metrics = pd.read_csv(out / "metrics_summary.csv")
+    assert metrics["is_defective"].sum() == 35 and (~metrics["is_defective"]).sum() == 14  # every strip once
+    assert set(metrics["fold"]) == {0, 1}
+    th = pd.read_csv(out / "thresholds.csv")
+    assert len(th) == 2 and th["pixel"].between(0, 1).all()
+    info = json.loads((out / "run_config.json").read_text())
+    assert info["config"]["method"] == "supervised"

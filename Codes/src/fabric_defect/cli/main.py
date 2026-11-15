@@ -46,6 +46,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--config", type=Path, default=None, help="TOML config overriding the defaults")
     run.add_argument("--seed", type=int, default=None, help="override config seed")
     run.add_argument("--scoring", choices=SCORING, default=None, help="override anomaly scoring method")
+    run.add_argument("--method", choices=["one_class", "supervised"], default=None,
+                     help="one_class: defect-free references; supervised: mask-trained, strip-grouped CV")
 
     ablate = sub.add_parser("ablate", help="run every variant of an ablation grid on shared features")
     _common(ablate, RESULTS_DIR / "ablation")
@@ -63,6 +65,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     # Imported here so --help stays fast (cv2/skimage/matplotlib are slow to import)
     from fabric_defect.pipelines.ablation import load_grid, run_ablation
     from fabric_defect.pipelines.benchmark import run_full_pipeline
+    from fabric_defect.pipelines.supervised import run_supervised
 
     # Config problems are user errors (exit 2); anything raised later is a bug and should surface
     try:
@@ -75,8 +78,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             results = run_ablation(args.grid, data_dir, args.out, synthetic=args.synthetic,
                                    cache_dir=cache_dir, workers=args.workers, max_test=args.max_test)
         else:
-            results = run_full_pipeline(cfg, data_dir=data_dir, out_dir=args.out, synthetic=args.synthetic,
-                                        cache_dir=cache_dir, workers=args.workers)
+            run = run_supervised if cfg.method == "supervised" else run_full_pipeline
+            results = run(cfg, data_dir=data_dir, out_dir=args.out, synthetic=args.synthetic,
+                          cache_dir=cache_dir, workers=args.workers)
     except FileNotFoundError as exc:
         log.error("%s", exc)
         return 2
@@ -91,6 +95,8 @@ def _run_config(args) -> PipelineConfig:
         cfg = replace(cfg, max_test_samples=args.max_test)
     if args.scoring is not None:
         cfg = replace(cfg, model=replace(cfg.model, scoring=args.scoring))
+    if args.method is not None:
+        cfg = replace(cfg, method=args.method)
     return cfg
 
 

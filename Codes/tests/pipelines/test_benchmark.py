@@ -45,3 +45,13 @@ def test_background_rows_exclude_defect_windows_and_other_strips():
     rows = background(feats, counts, ["a"], 64, ("glcm",))
     assert rows.tolist() == [[1.0]]  # only a's defect-free window; b is not a training strip
     assert background(feats, counts, [], 64, ("glcm",)) is None
+
+
+def test_supervised_fit_validation_split_per_stratum():
+    from fabric_defect.pipelines.supervised import _fit_split
+    train = np.arange(20)
+    strata = np.array([0] * 12 + [1] * 7 + [2])  # stratum 2 has a single strip
+    fit, val = _fit_split(train, strata, PipelineConfig(), fold=0)
+    assert sorted(np.concatenate([fit, val]).tolist()) == train.tolist() and not set(fit) & set(val)
+    assert (strata[val] == 0).sum() == 3 and (strata[val] == 1).sum() == 2 and 19 in fit
+    np.testing.assert_array_equal(_fit_split(train, strata, PipelineConfig(), fold=0)[1], val)

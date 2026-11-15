@@ -19,6 +19,7 @@ import pandas as pd
 from fabric_defect.core.config import PipelineConfig
 from fabric_defect.evaluation.metrics import summarize
 from fabric_defect.features.cache import load_features
+from fabric_defect.pipelines.supervised import run_supervised
 from fabric_defect.pipelines.benchmark import (
     feature_scales,
     load_manifest,
@@ -77,6 +78,17 @@ def run_ablation(
 
     rows = []
     for i, (name, cfg) in enumerate(variants, 1):
+        if cfg.method == "supervised":
+            # Supervised variants run their own strip-grouped CV; full outputs per variant folder
+            results = run_supervised(cfg, data_dir, out_dir / slug(name), synthetic, cache_dir, workers)
+            sup = cfg.supervised
+            row = {"variant": name, "method": "supervised", "window": sup.window,
+                   "ensemble": "+".join(map(str, sup.ensemble)) or "none", "pixel_stage": sup.pixel_stage,
+                   "hough": sup.hough_linking, "label_px": cfg.patch.defect_min_pixels, **summarize(results)}
+            rows.append(row)
+            log.info("[%d/%d] %s: pooled pixel F1 %.2f%%, IoU %.2f%% (n=%d)", i, len(variants), name,
+                     100 * row["pooled_pixel_dice"], 100 * row["pooled_pixel_iou"], row["n_images"])
+            continue
         test = select_test(manifest[manifest["is_defective"]], cfg.max_test_samples)
         split = split_by_fabric(clean, cfg)
         negatives = clean[clean["image_path"].isin([p for v in split.test.values() for p in v])]

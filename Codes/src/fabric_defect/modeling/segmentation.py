@@ -96,6 +96,12 @@ class DefectSegmenter:
 
         return cleaned_mask
 
+    def drop_small_components(self, binary_mask: np.ndarray) -> np.ndarray:
+        """Remove connected components smaller than min_area, without opening (keeps 1-2 px lines)."""
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(binary_mask, connectivity=8)
+        keep = np.flatnonzero(stats[1:, cv2.CC_STAT_AREA] >= self.min_defect_area) + 1
+        return np.where(np.isin(labels, keep), 255, 0).astype(np.uint8)
+
     def segment(
         self,
         heatmap: np.ndarray,

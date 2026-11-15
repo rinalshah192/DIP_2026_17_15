@@ -21,6 +21,7 @@ fabric-defect = "fabric_defect.cli.main:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+excel = ["openpyxl>=3.1"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
